@@ -1,0 +1,494 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>E.D.I.T.H.</title>
+<meta name="theme-color" content="#1c1830">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="E.D.I.T.H.">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icones/icone-180.png">
+<link rel="icon" type="image/png" href="icones/icone-192.png">
+<style>
+  :root {
+    color-scheme: dark;
+    --fond: #1c1830;
+    --carte: #28223f;
+    --carte-2: #332c4f;
+    --trait: #473f66;
+    --texte: #f4ead9;
+    --doux: #b6accb;
+    --accent: #f4b860;
+    --sur-accent: #2b1c05;
+    --ui: ui-rounded, "SF Pro Rounded", system-ui, -apple-system, "Segoe UI", sans-serif;
+    --conte: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; }
+  body {
+    margin: 0; background: var(--fond); color: var(--texte);
+    font: 17px/1.45 var(--ui);
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) 0 env(safe-area-inset-left);
+    -webkit-text-size-adjust: 100%;
+  }
+  [hidden] { display: none !important; }
+  .ecran { max-width: 760px; margin: 0 auto; padding: 20px 16px calc(24px + env(safe-area-inset-bottom)); min-height: 100%; }
+  h1 { font-size: 26px; line-height: 1.2; margin: 6px 0 4px; text-wrap: balance; }
+  .sous { color: var(--doux); margin: 0 0 18px; }
+  h2 { font-size: 14px; font-weight: 600; color: var(--doux); text-transform: uppercase; letter-spacing: .08em; margin: 24px 0 10px; }
+  button, input { font: inherit; color: inherit; }
+  button { cursor: pointer; }
+
+  .marque { display: flex; align-items: center; gap: 10px; color: var(--accent); font-weight: 700; letter-spacing: .14em; font-size: 14px; }
+  .lune { width: 22px; height: 22px; border-radius: 50%; box-shadow: inset -7px -2px 0 0 var(--accent); transform: rotate(-20deg); }
+
+  .grille { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+  @media (min-width: 620px) { .grille { grid-template-columns: repeat(3, 1fr); } }
+  .choix {
+    min-height: 58px; padding: 10px 12px; text-align: left; line-height: 1.25;
+    background: var(--carte); border: 1.5px solid transparent; border-radius: 16px; font-weight: 600;
+  }
+  .choix:active { background: var(--carte-2); }
+  .choix[aria-pressed="true"] { border-color: var(--accent); background: var(--carte-2); color: var(--accent); }
+  .large { grid-column: 1 / -1; }
+  .surprise { background: transparent; border: 1.5px dashed var(--trait); color: var(--accent); text-align: center; }
+
+  .libre { display: flex; gap: 8px; margin-top: 10px; }
+  .libre input, .champ {
+    flex: 1; min-width: 0; padding: 14px; border-radius: 14px; border: 1.5px solid var(--trait); background: transparent;
+  }
+  .libre input:focus, .champ:focus { outline: none; border-color: var(--accent); }
+  .libre button { padding: 0 18px; border-radius: 14px; border: 0; background: var(--carte-2); font-weight: 600; }
+
+  .principal {
+    width: 100%; padding: 16px; border: 0; border-radius: 18px; background: var(--accent); color: var(--sur-accent);
+    font-weight: 700; font-size: 19px;
+  }
+  .principal:disabled { opacity: .35; }
+  .discret { background: transparent; border: 0; color: var(--doux); padding: 10px 4px; text-decoration: underline; text-underline-offset: 3px; }
+  .retour { background: transparent; border: 0; color: var(--doux); padding: 8px 0; font-weight: 600; }
+
+  .barre {
+    position: sticky; bottom: 0; margin: 22px -16px 0; padding: 30px 16px calc(12px + env(safe-area-inset-bottom));
+    background: linear-gradient(to top, var(--fond) 84%, transparent);
+  }
+  .recap { text-align: center; color: var(--doux); margin: 0 0 10px; min-height: 1.45em; }
+  .recap b { color: var(--texte); }
+
+  label { display: block; color: var(--doux); font-size: 14px; margin: 14px 0 6px; }
+  .champ { width: 100%; display: block; }
+  .message { color: #ffb4a8; margin: 12px 0 0; min-height: 1.45em; }
+
+  /* Attente */
+  #attente { display: grid; place-items: center; text-align: center; min-height: 100svh; }
+  .ciel { position: relative; width: 150px; height: 150px; margin: 0 auto 26px; }
+  .ciel .astre { position: absolute; inset: 35px; border-radius: 50%; box-shadow: inset -22px -6px 0 0 var(--accent); transform: rotate(-20deg); }
+  .ciel i { position: absolute; width: 6px; height: 6px; border-radius: 50%; background: var(--texte); animation: scintille 2.4s ease-in-out infinite; }
+  .ciel i:nth-child(2) { left: 12px; top: 30px; }
+  .ciel i:nth-child(3) { right: 8px; top: 16px; animation-delay: .8s; width: 4px; height: 4px; }
+  .ciel i:nth-child(4) { left: 30px; bottom: 14px; animation-delay: 1.5s; width: 4px; height: 4px; }
+  .ciel i:nth-child(5) { right: 22px; bottom: 30px; animation-delay: .4s; }
+  @keyframes scintille { 0%, 100% { opacity: .2; transform: scale(.7); } 50% { opacity: 1; transform: scale(1.15); } }
+  @media (prefers-reduced-motion: reduce) { .ciel i { animation: none; opacity: .8; } }
+  #attenteTitre { font-size: 23px; font-weight: 700; margin: 0 0 8px; text-wrap: balance; }
+  #attentePhrase { color: var(--doux); min-height: 1.45em; margin: 0; }
+
+  /* Lecture */
+  #lecture { display: flex; flex-direction: column; min-height: 100svh; padding-bottom: 0; }
+  .entete { display: flex; align-items: center; justify-content: space-between; color: var(--doux); font-size: 14px; }
+  .fermer { background: transparent; border: 0; color: var(--doux); font-size: 26px; line-height: 1; padding: 6px 10px 6px 0; }
+  .points { display: flex; gap: 7px; }
+  .points span { width: 8px; height: 8px; border-radius: 50%; background: var(--trait); }
+  .points span.vu { background: var(--doux); }
+  .points span.ici { background: var(--accent); }
+  #titreHistoire { font: 700 27px/1.2 var(--conte); color: var(--accent); margin: 18px 0 4px; text-wrap: balance; }
+  #page { flex: 1; font: 21px/1.62 var(--conte); padding: 8px 0 24px; }
+  #page p { margin: 0 0 .85em; }
+  @media (min-width: 620px) { #page { font-size: 25px; } #titreHistoire { font-size: 34px; } }
+  .nav { position: sticky; bottom: 0; display: flex; gap: 10px; margin: 0 -16px; padding: 26px 16px calc(14px + env(safe-area-inset-bottom));
+    background: linear-gradient(to top, var(--fond) 80%, transparent); }
+  .nav .prec { flex: 0 0 64px; border-radius: 18px; border: 1.5px solid var(--trait); background: transparent; font-size: 20px; }
+  .nav .prec:disabled { opacity: .3; }
+</style>
+</head>
+<body>
+
+<!-- Connexion -->
+<main class="ecran" id="connexion" hidden>
+  <div class="marque"><span class="lune"></span>E.D.I.T.H.</div>
+  <h1>Et dodo : invente ton histoire</h1>
+  <p class="sous">Connexion avec le compte famille, une seule fois sur cet appareil.</p>
+  <label for="email">E-mail</label>
+  <input class="champ" id="email" type="email" autocomplete="username" inputmode="email">
+  <label for="mdp">Mot de passe</label>
+  <input class="champ" id="mdp" type="password" autocomplete="current-password">
+  <p class="message" id="msgConnexion"></p>
+  <button class="principal" id="btnConnexion">Se connecter</button>
+</main>
+
+<!-- Choix du héros -->
+<main class="ecran" id="choixHeros" hidden>
+  <div class="marque"><span class="lune"></span>E.D.I.T.H.</div>
+  <h1>Qui est le héros ce soir ?</h1>
+  <button class="discret" id="btnRelire" hidden></button>
+  <div id="listeHeros"></div>
+  <h2>Une autre idée</h2>
+  <form class="libre" id="formHeros">
+    <input id="herosLibre" placeholder="Un autre héros…" maxlength="60" enterkeyhint="done" autocomplete="off">
+    <button>OK</button>
+  </form>
+</main>
+
+<!-- Choix du thème -->
+<main class="ecran" id="choixTheme" hidden>
+  <button class="retour" id="btnRetourHeros">‹ Changer de héros</button>
+  <h1>Et l'histoire parle de quoi ?</h1>
+  <div id="listeThemes"></div>
+  <h2>Une autre idée</h2>
+  <form class="libre" id="formTheme">
+    <input id="themeLibre" placeholder="Un autre thème…" maxlength="60" enterkeyhint="done" autocomplete="off">
+    <button>OK</button>
+  </form>
+  <div class="barre">
+    <p class="recap" id="recap"></p>
+    <button class="principal" id="btnRaconte" disabled>Raconte !</button>
+  </div>
+</main>
+
+<!-- Attente -->
+<main class="ecran" id="attente" hidden>
+  <div>
+    <div class="ciel"><div class="astre"></div><i></i><i></i><i></i><i></i></div>
+    <p id="attenteTitre">E.D.I.T.H. invente ton histoire…</p>
+    <p id="attentePhrase"></p>
+    <div id="attenteErreur" hidden>
+      <p class="message" id="msgErreur"></p>
+      <button class="principal" id="btnReessayer" style="margin-top:14px">Réessayer</button>
+      <button class="discret" id="btnAbandon">Revenir au choix</button>
+    </div>
+  </div>
+</main>
+
+<!-- Lecture -->
+<main class="ecran" id="lecture" hidden>
+  <div class="entete">
+    <button class="fermer" id="btnFermer" aria-label="Fermer l'histoire">×</button>
+    <div class="points" id="points"></div>
+    <span id="numPage"></span>
+  </div>
+  <h1 id="titreHistoire"></h1>
+  <div id="page"></div>
+  <div class="nav">
+    <button class="prec" id="btnPrec" aria-label="Page précédente">‹</button>
+    <button class="principal" id="btnSuiv">Page suivante</button>
+  </div>
+</main>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="heros.js"></script>
+<script>
+  firebase.initializeApp({
+    apiKey: "AIzaSyC7sZDCVP-r34T33L6nEwWzibsrXnxletA",
+    authDomain: "diversif-bebe.firebaseapp.com",
+    projectId: "diversif-bebe",
+  });
+  const URL_RACONTE = "https://europe-west1-diversif-bebe.cloudfunctions.net/raconte";
+  const NB_PAGES = 6;
+  const $ = (id) => document.getElementById(id);
+  const ECRANS = ['connexion', 'choixHeros', 'choixTheme', 'attente', 'lecture'];
+  function montre(nom) {
+    for (const e of ECRANS) $(e).hidden = e !== nom;
+    window.scrollTo(0, 0);
+  }
+
+  // ——— État ———
+  let heros = null;        // { nom, fiche }
+  let theme = '';
+  let histoire = null;     // résultat de analyse()
+  let pageCourante = 0;
+  let annulation = null;   // AbortController de l'histoire en cours
+  let minuterie = null;
+
+  // ——— Lecture du texte envoyé par la fonction ———
+  // Format : TITRE : … / ### PAGE n / SCENE : … / texte / ### RESUME / phrase, puis [[DIAG]]{…}
+  function analyse(brut) {
+    const h = { titre: '', pages: [], resume: '', diag: null, fini: false };
+    const iDiag = brut.indexOf('[[DIAG]]');
+    if (iDiag >= 0) {
+      h.fini = true;
+      try { h.diag = JSON.parse(brut.slice(iDiag + 8)); } catch (e) {}
+      brut = brut.slice(0, iDiag);
+    }
+    const lignes = brut.split('\n');
+    if (!h.fini) {
+      // La dernière ligne est peut-être un marqueur en cours d'arrivée : on l'attend.
+      const fin = lignes[lignes.length - 1].trim();
+      if (fin.startsWith('#') || fin.startsWith('SCENE') || 'SCENE :'.startsWith(fin) || fin.startsWith('TITRE') || 'TITRE :'.startsWith(fin)) lignes.pop();
+    }
+    let mode = '', page = null, m;
+    for (const brute of lignes) {
+      const l = brute.trim();
+      if ((m = l.match(/^#{2,4}\s*PAGE\s*(\d+)/i))) { page = { scene: '', paras: [] }; h.pages.push(page); mode = 'page'; continue; }
+      if (/^#{2,4}\s*R[ÉE]SUM[ÉE]/i.test(l)) { mode = 'resume'; continue; }
+      if (!mode && (m = l.match(/^TITRE\s*:\s*(.+)$/i))) { h.titre = m[1].trim(); continue; }
+      if (mode === 'page') {
+        if ((m = l.match(/^SC[ÈE]NE\s*:\s*(.*)$/i))) { page.scene = m[1].trim(); continue; }
+        if (l) page.paras.push(l);
+      } else if (mode === 'resume' && l) {
+        h.resume += (h.resume ? ' ' : '') + l;
+      }
+    }
+    return h;
+  }
+
+  // ——— Connexion ———
+  firebase.auth().onAuthStateChanged((u) => {
+    if (!u) { montre('connexion'); return; }
+    if ($('connexion').hidden === false || ECRANS.every((e) => $(e).hidden)) accueil();
+  });
+  $('btnConnexion').onclick = async () => {
+    $('msgConnexion').textContent = '';
+    try {
+      await firebase.auth().signInWithEmailAndPassword($('email').value.trim(), $('mdp').value);
+    } catch (e) {
+      $('msgConnexion').textContent = 'Connexion impossible. Vérifie l\'e-mail et le mot de passe.';
+    }
+  };
+
+  // ——— Choix du héros ———
+  function grille(conteneur, groupes, auChoix) {
+    conteneur.innerHTML = '';
+    for (const g of groupes) {
+      const t = document.createElement('h2'); t.textContent = g.titre; conteneur.appendChild(t);
+      const d = document.createElement('div'); d.className = 'grille';
+      for (const nom of g.noms) {
+        const b = document.createElement('button');
+        b.className = 'choix'; b.type = 'button'; b.textContent = nom;
+        b.onclick = () => auChoix(nom, b);
+        d.appendChild(b);
+      }
+      conteneur.appendChild(d);
+    }
+  }
+  function auHasard(liste) { return liste[Math.floor(Math.random() * liste.length)]; }
+
+  function accueil() {
+    heros = null; theme = '';
+    const groupes = [];
+    for (const h of HEROS) {
+      let g = groupes.find((x) => x.titre === h.groupe);
+      if (!g) groupes.push(g = { titre: h.groupe, noms: [] });
+      g.noms.push(h.nom);
+    }
+    const c = $('listeHeros');
+    grille(c, groupes, (nom) => choisitHeros(nom));
+    const s = document.createElement('button');
+    s.className = 'choix surprise large'; s.type = 'button'; s.textContent = 'Surprise !';
+    s.onclick = () => choisitHeros(auHasard(HEROS).nom);
+    const enveloppe = document.createElement('div'); enveloppe.className = 'grille'; enveloppe.appendChild(s);
+    c.prepend(enveloppe);
+    $('herosLibre').value = '';
+    // Dernière histoire, au cas où l'app se serait refermée en cours de lecture
+    const d = derniere();
+    $('btnRelire').hidden = !d;
+    if (d) $('btnRelire').textContent = 'Relire la dernière : ' + d.titre;
+    montre('choixHeros');
+  }
+  function choisitHeros(nom) {
+    const connu = HEROS.find((h) => h.nom === nom);
+    heros = connu ? { nom: connu.nom, fiche: connu.fiche } : { nom, fiche: '' };
+    theme = '';
+    grille($('listeThemes'),
+      THEMES.map((g) => ({ titre: g.groupe, noms: g.noms })),
+      (n) => choisitTheme(n));
+    const s = document.createElement('button');
+    s.className = 'choix surprise large'; s.type = 'button'; s.textContent = 'Surprise !';
+    s.onclick = () => choisitTheme(auHasard(THEMES.flatMap((g) => g.noms)));
+    const enveloppe = document.createElement('div'); enveloppe.className = 'grille'; enveloppe.appendChild(s);
+    $('listeThemes').prepend(enveloppe);
+    $('themeLibre').value = '';
+    majRecap();
+    montre('choixTheme');
+  }
+  function choisitTheme(nom) {
+    theme = nom;
+    for (const b of $('listeThemes').querySelectorAll('.choix')) {
+      b.setAttribute('aria-pressed', b.textContent === nom ? 'true' : 'false');
+    }
+    majRecap();
+  }
+  function majRecap() {
+    const r = $('recap');
+    r.textContent = '';
+    const b = document.createElement('b'); b.textContent = heros.nom; r.appendChild(b);
+    if (theme) { r.append(' · '); const t = document.createElement('b'); t.textContent = theme; r.appendChild(t); }
+    $('btnRaconte').disabled = !theme;
+  }
+  $('formHeros').onsubmit = (e) => { e.preventDefault(); const v = $('herosLibre').value.trim(); if (v) choisitHeros(v); };
+  $('formTheme').onsubmit = (e) => { e.preventDefault(); const v = $('themeLibre').value.trim(); if (v) { choisitTheme(v); $('themeLibre').blur(); } };
+  $('btnRetourHeros').onclick = accueil;
+  $('btnRaconte').onclick = raconte;
+
+  // ——— Écriture de l'histoire ———
+  const PHRASES = [
+    'Elle taille ses crayons…',
+    'Elle cherche une bonne bêtise…',
+    'Elle choisit ses plus jolis mots…',
+    'Elle compte les pages…',
+    'Ça y est presque…',
+  ];
+  function attente(actif) {
+    clearInterval(minuterie);
+    $('attenteErreur').hidden = true;
+    $('attentePhrase').hidden = false;
+    $('attenteTitre').textContent = 'E.D.I.T.H. invente ton histoire…';
+    if (!actif) return;
+    let i = 0;
+    $('attentePhrase').textContent = heros.nom + ' · ' + theme;
+    minuterie = setInterval(() => { $('attentePhrase').textContent = PHRASES[Math.min(i++, PHRASES.length - 1)]; }, 3500);
+  }
+  function erreur(texte) {
+    clearInterval(minuterie);
+    $('attenteTitre').textContent = 'Oh, l\'histoire s\'est envolée.';
+    $('attentePhrase').hidden = true;
+    $('msgErreur').textContent = texte;
+    $('attenteErreur').hidden = false;
+    montre('attente');
+  }
+  $('btnReessayer').onclick = raconte;
+  $('btnAbandon').onclick = accueil;
+
+  async function raconte() {
+    if (annulation) annulation.abort();
+    annulation = new AbortController();
+    const signal = annulation.signal;
+    histoire = null; pageCourante = 0;
+    attente(true);
+    montre('attente');
+    veille(true);
+    let brut = '';
+    try {
+      const jeton = await firebase.auth().currentUser.getIdToken();
+      const rep = await fetch(URL_RACONTE, {
+        method: 'POST', signal,
+        headers: { 'Authorization': 'Bearer ' + jeton, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ heros: heros.nom, theme, fiche: heros.fiche }),
+      });
+      if (rep.status === 401) throw new Error('Ce compte n\'est pas le compte famille.');
+      if (!rep.ok) throw new Error('E.D.I.T.H. ne répond pas (erreur ' + rep.status + ').');
+      const lecteur = rep.body.getReader();
+      const dec = new TextDecoder();
+      for (;;) {
+        const { value, done } = await lecteur.read();
+        if (done) break;
+        brut += dec.decode(value, { stream: true });
+        histoire = analyse(brut);
+        if (histoire.pages[0] && histoire.pages[0].paras.length) {
+          if ($('lecture').hidden) { clearInterval(minuterie); montre('lecture'); }
+          affiche();
+        }
+      }
+      histoire = analyse(brut);
+      if (!histoire.pages.length || !histoire.pages[0].paras.length) {
+        const raison = histoire.diag && (histoire.diag.finRaison === 'refusal' ? 'E.D.I.T.H. n\'a pas su écrire cette histoire. Essaie un autre héros ou un autre thème.' : '');
+        throw new Error(raison || 'L\'histoire est arrivée vide.');
+      }
+      histoire.fini = true;
+      garde({ heros: heros.nom, theme, titre: histoire.titre || (heros.nom + ' · ' + theme), brut, date: Date.now() });
+      affiche();
+    } catch (e) {
+      if (signal.aborted) return;
+      if (histoire && histoire.pages[0] && histoire.pages[0].paras.length) {
+        // Coupure en cours de route : on garde ce qui est arrivé.
+        histoire.fini = true; affiche();
+      } else {
+        veille(false);
+        erreur(e.message && !/fetch|network|load/i.test(e.message) ? e.message : 'Pas de connexion. Vérifie le Wi-Fi et réessaie.');
+      }
+    }
+  }
+
+  // ——— Lecture page par page ———
+  function affiche() {
+    const h = histoire;
+    const nb = Math.max(NB_PAGES, h.pages.length);
+    if (pageCourante >= h.pages.length) pageCourante = h.pages.length - 1;
+    const p = h.pages[pageCourante];
+    $('titreHistoire').textContent = h.titre;
+    $('titreHistoire').hidden = pageCourante !== 0 || !h.titre;
+    const zone = $('page');
+    // On ne réécrit que ce qui a changé, pour ne pas faire sauter le texte pendant l'arrivée.
+    while (zone.children.length > p.paras.length) zone.lastChild.remove();
+    p.paras.forEach((t, i) => {
+      let el = zone.children[i];
+      if (!el) { el = document.createElement('p'); zone.appendChild(el); }
+      if (el.textContent !== t) el.textContent = t;
+    });
+    const pts = $('points'); pts.innerHTML = '';
+    for (let i = 0; i < nb; i++) {
+      const s = document.createElement('span');
+      s.className = i === pageCourante ? 'ici' : (i < pageCourante ? 'vu' : '');
+      pts.appendChild(s);
+    }
+    $('numPage').textContent = (pageCourante + 1) + ' / ' + nb;
+    $('btnPrec').disabled = pageCourante === 0;
+    const derniereArrivee = pageCourante >= h.pages.length - 1;
+    const suiv = $('btnSuiv');
+    if (!derniereArrivee) { suiv.textContent = 'Page suivante'; suiv.disabled = !h.pages[pageCourante + 1].paras.length; }
+    else if (h.fini) { suiv.textContent = 'Fin · bonne nuit'; suiv.disabled = false; }
+    else { suiv.textContent = 'La suite arrive…'; suiv.disabled = true; }
+  }
+  function tourne(sens) {
+    pageCourante += sens;
+    $('page').innerHTML = '';
+    affiche();
+    window.scrollTo(0, 0);
+  }
+  $('btnPrec').onclick = () => { if (pageCourante > 0) tourne(-1); };
+  $('btnSuiv').onclick = () => {
+    if (pageCourante < histoire.pages.length - 1) tourne(1);
+    else if (histoire.fini) quitte();
+  };
+  $('btnFermer').onclick = quitte;
+  function quitte() {
+    if (annulation) annulation.abort();
+    veille(false);
+    $('page').innerHTML = '';
+    accueil();
+  }
+
+  // ——— Dernière histoire (secours si l'app se referme) ———
+  function garde(d) { try { localStorage.setItem('edith.derniere', JSON.stringify(d)); } catch (e) {} }
+  function derniere() {
+    try {
+      const d = JSON.parse(localStorage.getItem('edith.derniere') || 'null');
+      return d && d.brut && Date.now() - d.date < 36 * 3600 * 1000 ? d : null;
+    } catch (e) { return null; }
+  }
+  $('btnRelire').onclick = () => {
+    const d = derniere(); if (!d) return;
+    heros = { nom: d.heros, fiche: '' }; theme = d.theme;
+    histoire = analyse(d.brut); histoire.fini = true; pageCourante = 0;
+    $('page').innerHTML = '';
+    montre('lecture'); affiche(); veille(true);
+  };
+
+  // ——— Garder l'écran allumé pendant la lecture ———
+  let verrou = null, veilleVoulue = false;
+  async function veille(actif) {
+    veilleVoulue = actif;
+    try {
+      if (actif && !verrou && navigator.wakeLock) {
+        verrou = await navigator.wakeLock.request('screen');
+        verrou.addEventListener('release', () => { verrou = null; });
+      } else if (!actif && verrou) { await verrou.release(); verrou = null; }
+    } catch (e) {}
+  }
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && veilleVoulue) veille(true); });
+</script>
+</body>
+</html>
