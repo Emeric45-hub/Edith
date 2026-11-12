@@ -114,6 +114,17 @@
   .illu.attend { animation: souffle 2.2s ease-in-out infinite; }
   @keyframes souffle { 0%, 100% { background: var(--carte); } 50% { background: var(--carte-2); } }
   @media (prefers-reduced-motion: reduce) { .illu.attend { animation: none; } .illu img { transition: none; } }
+  /* iPad à l'horizontale : image à gauche, texte à droite */
+  @media (min-width: 900px) and (orientation: landscape) {
+    #lecture.deux { max-width: 1240px; display: grid; grid-template-columns: 1fr 1fr; column-gap: 32px;
+      grid-template-rows: auto auto 1fr auto auto; align-content: start; }
+    #lecture.deux .entete { grid-column: 1 / -1; }
+    #lecture.deux .illu { grid-column: 1; grid-row: 2 / 6; align-self: start; position: sticky; top: 24px; margin-top: 18px; }
+    #lecture.deux #titreHistoire, #lecture.deux #page, #lecture.deux .mesure, #lecture.deux .nav { grid-column: 2; }
+    #lecture.deux #titreHistoire { font-size: 30px; }
+    #lecture.deux #page { font-size: 23px; padding-top: 14px; }
+    #lecture.deux .nav { margin: 0; padding-left: 0; padding-right: 0; align-self: end; }
+  }
   .mesure { color: var(--trait); font: 12px var(--ui); margin: 18px 0 0; }
   .nav { position: sticky; bottom: 0; display: flex; gap: 10px; margin: 0 -16px; padding: 26px 16px calc(14px + env(safe-area-inset-bottom));
     background: linear-gradient(to top, var(--fond) 80%, transparent); }
@@ -471,6 +482,7 @@
     const prete = typeof img === 'string' && img.startsWith('data:');
     cadre.hidden = !(prete || img === 'attente' || img === 'encours');
     cadre.classList.toggle('attend', !prete);
+    $('lecture').classList.toggle('deux', !cadre.hidden);
     if (prete) { if (balise.src !== img) { balise.classList.remove('pret'); balise.onload = () => balise.classList.add('pret'); balise.src = img; } }
     else { balise.classList.remove('pret'); balise.removeAttribute('src'); }
     const mesure = $('mesure'), dg = h.diag;
