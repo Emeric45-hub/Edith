@@ -192,7 +192,7 @@ const SCENES = [
   'Night: a little cottage with glowing windows under a big gentle moon, a potato with a small candle on the windowsill, a quiet potato field in the moonlight',
 ];
 
-const CONSIGNE_IMAGE = 'No characters, no people, no faces, no text, no letters, no logos. Landscape composition, calm and joyful, suitable for a 4-year-old at bedtime.';
+const CONSIGNE_IMAGE = 'No story characters, no people, no faces, no text, no letters, no logos. Full-bleed landscape composition filling the whole frame edge to edge: no border, no margin, no frame, no card. Calm and joyful, suitable for a 4-year-old at bedtime.';
 
 async function jetonGoogle() {
   const r = await fetch('http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token', {
@@ -233,7 +233,7 @@ async function genereGemini(modele, consigne, jeton) {
   const attentes = [2000, 5000, 10000, 20000];
   for (let essai = 0; ; essai++) {
     try {
-      return await genereGeminiUneFois(modele, consigne, jeton);
+      return { ...(await genereGeminiUneFois(modele, consigne, jeton)), essais: essai + 1 };
     } catch (e) {
       if (!e.message.includes(' 429 ') || essai >= attentes.length) throw e;
       await pause(attentes[essai] + Math.random() * 1000);
@@ -290,6 +290,7 @@ export const illustre = onRequest(
     try {
       const jeton = await jetonGoogle();
       let image = await genereGemini(modele, consigne, jeton);
+      const essais = image.essais;
       const koAvant = Math.round(image.donnees.length * 0.75 / 1024);
       // Allègement : les images arrivent en PNG d'environ 2 Mo.
       try {
@@ -303,8 +304,8 @@ export const illustre = onRequest(
         console.error('illustre : allègement impossible', e.message);
       }
       const ms = Date.now() - debut;
-      console.log(JSON.stringify({ mesure: 'illustre', modele: modele.id, ms, koAvant, ko: Math.round(image.donnees.length * 0.75 / 1024) }));
-      res.json({ ms, mime: image.mime, donnees: image.donnees });
+      console.log(JSON.stringify({ mesure: 'illustre', modele: modele.id, ms, essais, koAvant, ko: Math.round(image.donnees.length * 0.75 / 1024) }));
+      res.json({ ms, essais, mime: image.mime, donnees: image.donnees });
     } catch (e) {
       console.error('illustre', modele.id, e.message);
       res.status(502).json({ erreur: e.message, ms: Date.now() - debut });
