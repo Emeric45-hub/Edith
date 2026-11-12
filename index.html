@@ -182,6 +182,7 @@
     <div class="ciel"><div class="astre"></div><i></i><i></i><i></i><i></i></div>
     <p id="attenteTitre">E.D.I.T.H. invente ton histoire…</p>
     <p id="attentePhrase"></p>
+    <button class="principal" id="btnLire" hidden style="margin-top:26px;min-width:260px"></button>
     <div id="attenteErreur" hidden>
       <p class="message" id="msgErreur"></p>
       <button class="principal" id="btnReessayer" style="margin-top:14px">Réessayer</button>
@@ -237,6 +238,7 @@
   let images = [];         // par page : 'attente', 'encours', 'echec' ou l'image (data:…)
   let style = '';          // un seul style d'illustration par histoire
   let dessinEnCours = false;
+  let tempsImages = [];    // durée de chaque image, pour la ligne de mesure
 
   // ——— Lecture du texte envoyé par la fonction ———
   // Format : TITRE : … / ### PAGE n / SCENE : … / texte / ### RESUME / phrase, puis [[DIAG]]{…}
@@ -368,6 +370,7 @@
   ];
   function attente(actif) {
     clearInterval(minuterie);
+    $('btnLire').hidden = true;
     $('attenteErreur').hidden = true;
     $('attentePhrase').hidden = false;
     $('attenteTitre').textContent = 'E.D.I.T.H. invente ton histoire…';
@@ -378,12 +381,28 @@
   }
   function erreur(texte) {
     clearInterval(minuterie);
+    $('btnLire').hidden = true;
     $('attenteTitre').textContent = 'Oh, l\'histoire s\'est envolée.';
     $('attentePhrase').hidden = true;
     $('msgErreur').textContent = texte;
     $('attenteErreur').hidden = false;
     montre('attente');
   }
+  // Préparation : on peut lancer l'histoire à l'avance (brossage de dents) et la lire quand tout est prêt.
+  function progres() {
+    if (!histoire || $('attente').hidden || !$('attenteErreur').hidden) return;
+    if (!(histoire.pages[0] && histoire.pages[0].paras.length)) return;
+    clearInterval(minuterie);
+    const pretes = images.filter((x) => typeof x === 'string' && x.startsWith('data:')).length;
+    const reglees = pretes + images.filter((x) => x === 'echec').length;
+    const tout = histoire.fini && reglees >= histoire.pages.length;
+    $('attenteTitre').textContent = tout ? 'L\'histoire est prête !' : 'E.D.I.T.H. dessine les images…';
+    $('attentePhrase').textContent = (histoire.fini ? 'Texte écrit' : 'Le texte s\'écrit') + ' · images : ' + pretes + ' sur ' + NB_PAGES;
+    $('btnLire').textContent = tout ? 'Lire l\'histoire' : 'Lire sans attendre';
+    $('btnLire').hidden = false;
+  }
+  function rafraichit() { if ($('lecture').hidden) progres(); else affiche(); }
+  $('btnLire').onclick = () => { $('page').innerHTML = ''; montre('lecture'); affiche(); };
   $('btnReessayer').onclick = raconte;
   $('btnAbandon').onclick = accueil;
 
@@ -392,7 +411,7 @@
     annulation = new AbortController();
     const signal = annulation.signal;
     histoire = null; pageCourante = 0;
-    images = []; style = auHasard(STYLES);
+    images = []; tempsImages = []; style = auHasard(STYLES);
     attente(true);
     montre('attente');
     veille(true);
@@ -414,10 +433,7 @@
         brut += dec.decode(value, { stream: true });
         histoire = analyse(brut);
         dessine(signal);
-        if (histoire.pages[0] && histoire.pages[0].paras.length) {
-          if ($('lecture').hidden) { clearInterval(minuterie); montre('lecture'); }
-          affiche();
-        }
+        rafraichit();
       }
       histoire = analyse(brut);
       if (!histoire.pages.length || !histoire.pages[0].paras.length) {
@@ -427,12 +443,12 @@
       histoire.fini = true;
       dessine(signal);
       garde({ heros: heros.nom, theme, titre: histoire.titre || (heros.nom + ' · ' + theme), brut, date: Date.now() });
-      affiche();
+      rafraichit();
     } catch (e) {
       if (signal.aborted) return;
       if (histoire && histoire.pages[0] && histoire.pages[0].paras.length) {
         // Coupure en cours de route : on garde ce qui est arrivé.
-        histoire.fini = true; affiche();
+        histoire.fini = true; rafraichit();
       } else {
         veille(false);
         erreur(e.message && !/fetch|network|load/i.test(e.message) ? e.message : 'Pas de connexion. Vérifie le Wi-Fi et réessaie.');
@@ -453,6 +469,7 @@
         images[i] = 'encours';
         const mesImages = images;
         let resultat = 'echec';
+        const t0 = Date.now();
         try {
           const jeton = await firebase.auth().currentUser.getIdToken();
           const rep = await fetch(URL_ILLUSTRE, {
@@ -462,10 +479,11 @@
           });
           const d = await rep.json();
           if (rep.ok && d.donnees) resultat = 'data:' + d.mime + ';base64,' + d.donnees;
-        } catch (e) {}
+          tempsImages[i] = Math.round((Date.now() - t0) / 1000) + ' s' + (d.essais > 1 ? ' (' + d.essais + ' essais)' : '') + (resultat === 'echec' ? ' échec' : '');
+        } catch (e) { tempsImages[i] = 'échec'; }
         if (signal.aborted || mesImages !== images) break;
         images[i] = resultat;
-        if (!$('lecture').hidden) affiche();
+        rafraichit();
       }
     } finally { dessinEnCours = false; }
   }
@@ -487,7 +505,7 @@
     else { balise.classList.remove('pret'); balise.removeAttribute('src'); }
     const mesure = $('mesure'), dg = h.diag;
     mesure.hidden = !(h.fini && dg && pageCourante === h.pages.length - 1);
-    if (!mesure.hidden) mesure.textContent = 'Écrite en ' + Math.round(dg.totalMs / 1000) + ' s, premiers mots à ' + Math.round(dg.premiersMotsMs / 1000) + ' s · ' + dg.jetonsSortie + ' jetons · images : ' + style;
+    if (!mesure.hidden) mesure.textContent = 'Écrite en ' + Math.round(dg.totalMs / 1000) + ' s, premiers mots à ' + Math.round(dg.premiersMotsMs / 1000) + ' s · ' + dg.jetonsSortie + ' jetons · images ' + style + ' : ' + tempsImages.join(', ');
     const zone = $('page');
     // On ne réécrit que ce qui a changé, pour ne pas faire sauter le texte pendant l'arrivée.
     while (zone.children.length > p.paras.length) zone.lastChild.remove();
@@ -540,7 +558,7 @@
   $('btnRelire').onclick = () => {
     const d = derniere(); if (!d) return;
     heros = { nom: d.heros, fiche: '' }; theme = d.theme;
-    histoire = analyse(d.brut); histoire.fini = true; histoire.diag = null; pageCourante = 0; images = [];
+    histoire = analyse(d.brut); histoire.fini = true; histoire.diag = null; pageCourante = 0; images = []; tempsImages = [];
     $('page').innerHTML = '';
     montre('lecture'); affiche(); veille(true);
   };

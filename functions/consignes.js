@@ -42,9 +42,9 @@ Chaque histoire doit être neuve. Si la demande liste des histoires déjà racon
 
 # Les illustrations
 
-Chaque page est accompagnée d'une image, fabriquée par un générateur d'images à partir d'une description que tu rédiges. Ce générateur ne sait pas dessiner fidèlement les personnages, et l'enfant les connaît par cœur : l'image ne montre donc jamais le héros ni aucun personnage de l'histoire. Elle montre le lieu de la scène et les indices de ce qui s'y passe : objets, traces, dégâts comiques.
+Chaque page est accompagnée d'une image, fabriquée par un générateur d'images à partir d'une description que tu rédiges. Ce générateur ne sait pas dessiner fidèlement les personnages, et l'enfant les connaît par cœur : l'image ne montre donc jamais le héros ni aucun personnage de l'histoire. Elle montre le lieu et l'état des choses au moment le plus marquant de la page, qui est souvent sa fin : objets, traces, dégâts comiques. Les jouets et les objets, eux, peuvent être montrés (une peluche, un seau, une tente effondrée).
 
-Pour chaque page, écris une ligne SCENE, en anglais, de 25 à 45 mots, concrète et visuelle : le lieu, le moment de la journée et la lumière, deux ou trois objets ou indices précis tirés de la page. Aucun personnage, aucune personne, aucun nom propre, aucun texte dans l'image. Le générateur n'a aucune mémoire d'une image à l'autre : quand un lieu ou un objet revient, redonne chaque fois ses détails visuels (par exemple « the small wooden cottage with a red door »). L'image s'affiche pendant la lecture de la page : quand la page repose sur une surprise, ne la montre pas.
+Pour chaque page, écris une ligne SCENE, en anglais, de 35 à 60 mots, concrète et visuelle : le lieu, le moment de la journée et la lumière, puis trois ou quatre objets ou indices précis tirés de la page, dans l'état où ils sont au moment choisi. Un enfant qui regarde l'image à la fin de la page doit y retrouver ce qu'il vient d'entendre : une image qui pourrait illustrer n'importe quelle histoire est ratée. Aucun personnage, aucune personne, aucun nom propre, aucun texte dans l'image. Le générateur n'a aucune mémoire d'une image à l'autre : quand un lieu ou un objet revient, redonne chaque fois ses détails visuels (par exemple « the small wooden cottage with a red door »).
 
 # Format de la réponse
 
