@@ -87,6 +87,8 @@ export const raconte = onRequest(
     if (!reponse.ok || !reponse.body) {
       const detail = await reponse.text().catch(() => '');
       console.error('Erreur Claude', reponse.status, detail.slice(0, 500));
+      // Crédit prépayé épuisé : le dire clairement à l'app
+      if (/credit balance/i.test(detail)) { res.status(402).send('Crédit Claude épuisé'); return; }
       res.status(502).send(`Erreur Claude ${reponse.status}`);
       return;
     }
