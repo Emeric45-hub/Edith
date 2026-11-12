@@ -1,0 +1,58 @@
+name: Déployer la fonction
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'functions/**'
+      - 'firebase.json'
+      - '.github/workflows/deploy-functions.yml'
+  workflow_dispatch:
+    inputs:
+      envoyer_cle:
+        description: "Envoyer aussi la clé Claude à Firebase (à cocher au premier lancement ou après un changement de clé)"
+        type: boolean
+        default: false
+
+concurrency:
+  group: deploy-functions
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+
+      - name: Installer les dépendances de la fonction
+        run: npm install --omit=dev --no-audit --no-fund
+        working-directory: functions
+
+      - name: Préparer l'accès au projet Firebase
+        env:
+          SA: ${{ secrets.FIREBASE_DEPLOY_SA }}
+        run: |
+          printf '%s' "$SA" > "$RUNNER_TEMP/sa.json"
+          echo "GOOGLE_APPLICATION_CREDENTIALS=$RUNNER_TEMP/sa.json" >> "$GITHUB_ENV"
+
+      - name: Envoyer la clé Claude à Firebase
+        if: github.event_name == 'workflow_dispatch' && inputs.envoyer_cle
+        env:
+          CLE: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          printf '%s' "$CLE" > "$RUNNER_TEMP/cle.txt"
+          npx --yes firebase-tools@latest functions:secrets:set ANTHROPIC_API_KEY \
+            --data-file "$RUNNER_TEMP/cle.txt" --project diversif-bebe --non-interactive --force
+          rm -f "$RUNNER_TEMP/cle.txt"
+
+      - name: Déployer
+        run: npx --yes firebase-tools@latest deploy --only functions:edith --project diversif-bebe --non-interactive --force
+
+      - name: Nettoyer
+        if: always()
+        run: rm -f "$RUNNER_TEMP/sa.json" "$RUNNER_TEMP/cle.txt"
