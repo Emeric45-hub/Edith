@@ -87,6 +87,12 @@ Comique : Winnie et les pots de miel, coincé pour avoir trop mangé, les bonds 
 Stitch parle peu, mange n'importe quoi, adore la musique.
 Comique : le chaos qu'il sème, puis sa façon de tout réparer et de réclamer un câlin.` },
 
+  { groupe: 'Les copains', nom: 'Les Aristochats', fiche:
+`À Paris, Duchesse, chatte blanche très élégante, et ses trois chatons : Marie (blanche, nœud rose, coquette, se prend pour une grande dame), Toulouse (roux, peintre barbouilleur, rêve d'être un dur chat de gouttière) et Berlioz (gris, pianiste, taquin). Ils vivent chez Madame de Bonnefamille.
+Thomas O'Malley, chat de gouttière débrouillard et charmeur ; Roquefort, petite souris amie de la famille ; Scat Cat et sa bande de chats musiciens de jazz ; les oies Amélie et Amélia, qui jacassent et marchent en rang ; les chiens de ferme Napoléon et Lafayette, qui se disputent pour savoir qui commande.
+Edgar, le majordome, est maladroit et ridicule : ses plans ratent toujours.
+Comique : les chamailleries des trois chatons, les bonnes manières de Marie mises à rude épreuve, les oies, les deux chiens.` },
+
   // ——— Princesses et héroïnes ———
   { groupe: 'Princesses et héroïnes', nom: 'Blanche-Neige', fiche:
 `Douce et gaie, elle chante, les animaux de la forêt l'aident. Elle vit dans la chaumière des sept nains : Prof (s'emmêle dans ses mots), Grincheux (ronchonne), Joyeux, Dormeur (s'endort partout), Atchoum (éternuements énormes), Timide, Simplet (ne parle pas, maladroit).
