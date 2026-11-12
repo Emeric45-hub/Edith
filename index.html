@@ -139,6 +139,12 @@
   .ligne.retire { opacity: .45; }
   textarea.champ { font: inherit; color: inherit; line-height: 1.45; resize: vertical; }
   .champ:disabled { opacity: .6; }
+  .roue { margin-left: auto; display: grid; place-items: center; width: 40px; height: 40px; margin-right: -8px; padding: 0; border: 0; border-radius: 50%; background: transparent; color: var(--doux); }
+  .roue:active { background: var(--carte); }
+  .rang { display: flex; gap: 8px; margin: 0 0 10px; }
+  .rang .preferee { margin: 0; flex: 1; min-width: 0; }
+  .suppr { flex: 0 0 auto; padding: 0 14px; border: 0; border-radius: 16px; background: var(--carte); color: var(--doux); font-size: 14px; font-weight: 600; }
+  .suppr.sur { background: #5a2733; color: #ffc2cc; }
   .mesure { color: var(--trait); font: 12px var(--ui); margin: 18px 0 0; }
   .nav { position: sticky; bottom: 0; display: flex; gap: 10px; margin: 0 -16px; padding: 26px 16px calc(14px + env(safe-area-inset-bottom));
     background: linear-gradient(to top, var(--fond) 80%, transparent); }
@@ -163,7 +169,11 @@
 
 <!-- Choix du héros -->
 <main class="ecran" id="choixHeros" hidden>
-  <div class="marque"><span class="lune"></span>E.D.I.T.H.</div>
+  <div class="marque"><span class="lune"></span>E.D.I.T.H.
+    <button class="roue" id="btnReglages" type="button" aria-label="Réglages : héros, fiches et thèmes">
+      <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3.2"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1.03 1.56V21a2 2 0 1 1-4 0v-.09A1.7 1.7 0 0 0 8.9 19.4a1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.7 1.7 0 0 0 .34-1.87 1.7 1.7 0 0 0-1.56-1.03H3a2 2 0 1 1 0-4h.09A1.7 1.7 0 0 0 4.6 8.9a1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.7 1.7 0 0 0 1.87.34H9a1.7 1.7 0 0 0 1-1.55V3a2 2 0 1 1 4 0v.09a1.7 1.7 0 0 0 1.03 1.56 1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.7 1.7 0 0 0-.34 1.87V9c.26.6.85 1 1.51 1H21a2 2 0 1 1 0 4h-.09c-.66 0-1.25.4-1.51 1Z"/></svg>
+    </button>
+  </div>
   <h1>Qui est le héros ce soir ?</h1>
   <div class="grille" id="zonePreferees" hidden style="margin-top:14px"><button class="choix large" id="btnPreferees" type="button" style="color:#ff8fa3">♥ Ses préférées</button></div>
   <button class="discret" id="btnRelire" hidden></button>
@@ -174,7 +184,6 @@
     <button>OK</button>
   </form>
   <div id="zonePropose" style="margin-top:18px"></div>
-  <button class="discret" id="btnReglages" style="margin-top:26px">Réglages : héros, fiches et thèmes</button>
 </main>
 
 <!-- Réglages -->
@@ -226,6 +235,8 @@
     <input id="themeLibre" placeholder="Un autre thème…" maxlength="60" enterkeyhint="done" autocomplete="off">
     <button>OK</button>
   </form>
+  <h2>Le style des images</h2>
+  <div class="grille" id="listeStyles"></div>
   <div class="barre">
     <p class="recap" id="recap"></p>
     <button class="principal" id="btnRaconte" disabled>Raconte !</button>
@@ -278,7 +289,16 @@
   });
   const URL_RACONTE = "https://europe-west1-diversif-bebe.cloudfunctions.net/raconte";
   const URL_ILLUSTRE = "https://europe-west1-diversif-bebe.cloudfunctions.net/illustre";
-  const STYLES = ['aquarelle', 'gouache', 'papier', 'crayons', 'pastel', 'modeler', 'lino'];
+  const STYLES = [['aquarelle', 'Aquarelle'], ['gouache', 'Gouache'], ['papier', 'Papier découpé'], ['crayons', 'Crayons de couleur'],
+    ['pastel', 'Pastel'], ['modeler', 'Pâte à modeler'], ['lino', 'Linogravure']];
+  const nomStyle = (cle) => (STYLES.find((x) => x[0] === cle) || ['', cle])[1];
+  let styleChoisi = '';    // '' : surprise
+  // Surprise : au hasard, mais jamais le même style deux soirs de suite
+  function tireStyle() {
+    let dernier = ''; try { dernier = localStorage.getItem('edith.style') || ''; } catch (e) {}
+    const possibles = STYLES.map((x) => x[0]).filter((c) => c !== dernier);
+    return possibles[Math.floor(Math.random() * possibles.length)];
+  }
   const NB_PAGES = 6;
   const $ = (id) => document.getElementById(id);
   const ECRANS = ['connexion', 'choixHeros', 'reglages', 'ficheHeros', 'preferees', 'choixTheme', 'attente', 'lecture'];
@@ -439,8 +459,19 @@
     const enveloppe = document.createElement('div'); enveloppe.className = 'grille'; enveloppe.appendChild(s);
     $('listeThemes').prepend(enveloppe);
     $('themeLibre').value = '';
+    styleChoisi = ''; majStyles();
     majRecap();
     montre('choixTheme');
+  }
+  function majStyles() {
+    const z = $('listeStyles'); z.innerHTML = '';
+    for (const [cle, nom] of [['', 'Surprise !']].concat(STYLES)) {
+      const b = document.createElement('button'); b.type = 'button';
+      b.className = 'choix' + (cle ? '' : ' surprise large'); b.textContent = nom;
+      b.setAttribute('aria-pressed', cle === styleChoisi ? 'true' : 'false');
+      b.onclick = () => { styleChoisi = cle; majStyles(); };
+      z.appendChild(b);
+    }
   }
   function choisitTheme(nom) {
     theme = nom;
@@ -512,7 +543,8 @@
     annulation = new AbortController();
     const signal = annulation.signal;
     histoire = null; pageCourante = 0;
-    images = []; tempsImages = []; style = auHasard(STYLES);
+    images = []; tempsImages = []; style = styleChoisi || tireStyle();
+    try { localStorage.setItem('edith.style', style); } catch (e) {}
     gardee = false; idHistoire = null; sauvees = [];
     attente(true);
     montre('attente');
@@ -616,7 +648,7 @@
     if (!fin) $('msgCoeur').hidden = true;
     const mesure = $('mesure'), dg = h.diag;
     mesure.hidden = !(h.fini && dg && pageCourante === h.pages.length - 1);
-    if (!mesure.hidden) mesure.textContent = 'Écrite en ' + Math.round(dg.totalMs / 1000) + ' s, premiers mots à ' + Math.round(dg.premiersMotsMs / 1000) + ' s · ' + dg.jetonsSortie + ' jetons · images ' + style + ' : ' + tempsImages.join(', ');
+    if (!mesure.hidden) mesure.textContent = 'Écrite en ' + Math.round(dg.totalMs / 1000) + ' s, premiers mots à ' + Math.round(dg.premiersMotsMs / 1000) + ' s · ' + dg.jetonsSortie + ' jetons · images ' + nomStyle(style) + ' : ' + tempsImages.join(', ');
     const zone = $('page');
     // On ne réécrit que ce qui a changé, pour ne pas faire sauter le texte pendant l'arrivée.
     while (zone.children.length > p.paras.length) zone.lastChild.remove();
@@ -765,7 +797,23 @@
         const s = document.createElement('span'); s.textContent = h.heros + ' · ' + h.theme;
         b.append(t, s);
         b.onclick = () => ouvrePreferee(h);
-        zone.appendChild(b);
+        const rang = document.createElement('div'); rang.className = 'rang';
+        const x = document.createElement('button'); x.className = 'suppr'; x.type = 'button'; x.textContent = 'Supprimer';
+        let minuterieX = null;
+        x.onclick = async () => {
+          if (!x.classList.contains('sur')) {
+            x.classList.add('sur'); x.textContent = 'Sûr ?';
+            minuterieX = setTimeout(() => { x.classList.remove('sur'); x.textContent = 'Supprimer'; }, 4000);
+            return;
+          }
+          clearTimeout(minuterieX); x.disabled = true; x.textContent = '…';
+          try {
+            await supprime(h.id); rang.remove();
+            if (!zone.children.length) zone.textContent = 'Aucune histoire gardée pour le moment.';
+          } catch (e) { x.disabled = false; x.classList.remove('sur'); x.textContent = 'Réessayer'; }
+        };
+        rang.append(b, x);
+        zone.appendChild(rang);
       }
     } catch (e) { zone.textContent = 'Impossible de charger les préférées. Vérifie la connexion.'; }
   };
