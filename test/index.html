@@ -35,6 +35,12 @@
   <input id="heros" value="les 7 ours">
   <label>Thème</label>
   <input id="theme" value="les dinosaures">
+  <label>Effort de réflexion</label>
+  <select id="effort" style="width:100%;font:inherit;padding:10px;border-radius:10px;background:transparent;color:inherit">
+    <option value="low">Bas (plus rapide)</option>
+    <option value="medium" selected>Moyen</option>
+    <option value="high">Élevé (plus lent)</option>
+  </select>
   <button id="btnRaconte">Raconte !</button>
 </div>
 
@@ -82,7 +88,7 @@
       const rep = await fetch(URL_FONCTION, {
         method: 'POST',
         headers: { 'Authorization': 'Bearer ' + jeton, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ heros: $('heros').value, theme: $('theme').value }),
+        body: JSON.stringify({ heros: $('heros').value, theme: $('theme').value, effort: $('effort').value }),
       });
       if (!rep.ok) throw new Error('Réponse ' + rep.status + ' : ' + (await rep.text()));
       const lecteur = rep.body.getReader();
@@ -91,12 +97,28 @@
         const { value, done } = await lecteur.read();
         if (done) break;
         const morceau = dec.decode(value, { stream: true });
-        if (morceau && !tPremier) tPremier = performance.now() - t0;
+        if (morceau && !morceau.startsWith('\n\n[[DIAG]]') && !tPremier) tPremier = performance.now() - t0;
         nb += morceau.length;
         $('histoire').textContent += morceau;
         affiche(false);
       }
       affiche(true);
+      // Diagnostic envoyé par la fonction à la fin du texte
+      const tout = $('histoire').textContent;
+      const i = tout.indexOf('[[DIAG]]');
+      if (i >= 0) {
+        $('histoire').textContent = tout.slice(0, i).trim();
+        try {
+          const d = JSON.parse(tout.slice(i + 8));
+          const s = (ms) => ms ? (ms / 1000).toFixed(1) + ' s' : '—';
+          $('mesures').textContent +=
+            '\n\nEffort : ' + d.effort +
+            '\nDébut de réflexion (serveur) : ' + s(d.reflexionDebutMs) +
+            '\nPremiers mots (serveur) : ' + s(d.premiersMotsMs) +
+            '\nJetons produits : ' + d.jetonsSortie +
+            '\nFin : ' + (d.finRaison || '—') + (d.erreur ? ' · erreur ' + d.erreur : '');
+        } catch (e) {}
+      }
     } catch (e) {
       $('mesures').textContent = 'Erreur : ' + e.message;
     } finally {

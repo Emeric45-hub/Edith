@@ -62,6 +62,8 @@ export const raconte = onRequest(
     }
 
     // 2. Demande
+    const EFFORTS = ['low', 'medium', 'high'];
+    const effort = EFFORTS.includes(req.body?.effort) ? req.body.effort : 'medium';
     const heros = String(req.body?.heros || '').slice(0, 80).trim();
     const theme = String(req.body?.theme || '').slice(0, 80).trim();
     if (!heros || !theme) { res.status(400).send('Héros et thème obligatoires'); return; }
@@ -77,8 +79,9 @@ export const raconte = onRequest(
       },
       body: JSON.stringify({
         model: MODELE,
-        max_tokens: 3000,
+        max_tokens: 16000, // la réflexion de Fable compte dans cette limite
         stream: true,
+        output_config: { effort },
         system: CONSIGNES,
         messages: [{ role: 'user', content: `Héros : ${heros}\nThème : ${theme}` }],
       }),
@@ -103,6 +106,9 @@ export const raconte = onRequest(
     let tampon = '';
     let premier = 0;
     let jetonsSortie = 0;
+    let premiereReflexion = 0;
+    let finRaison = '';
+    let erreur = '';
 
     try {
       for (;;) {
@@ -115,20 +121,36 @@ export const raconte = onRequest(
           if (!ligne.startsWith('data:')) continue;
           let evt;
           try { evt = JSON.parse(ligne.slice(5).trim()); } catch { continue; }
-          if (evt.type === 'content_block_delta' && evt.delta?.type === 'text_delta') {
+          if (evt.type === 'content_block_start' && evt.content_block?.type === 'thinking') {
+            if (!premiereReflexion) premiereReflexion = Date.now() - debut;
+          } else if (evt.type === 'content_block_delta' && evt.delta?.type === 'text_delta') {
             if (!premier) premier = Date.now() - debut;
             res.write(evt.delta.text);
-          } else if (evt.type === 'message_delta' && evt.usage) {
-            jetonsSortie = evt.usage.output_tokens || jetonsSortie;
+          } else if (evt.type === 'message_delta') {
+            if (evt.usage) jetonsSortie = evt.usage.output_tokens || jetonsSortie;
+            if (evt.delta?.stop_reason) finRaison = evt.delta.stop_reason;
           } else if (evt.type === 'error') {
+            erreur = evt.error?.type || 'erreur';
             console.error('Erreur Claude en flux', JSON.stringify(evt).slice(0, 500));
           }
         }
       }
     } finally {
+      // Diagnostic lisible sur la page de test, séparé du texte par un marqueur
+      res.write('\n\n[[DIAG]]' + JSON.stringify({
+        effort,
+        reflexionDebutMs: premiereReflexion,
+        premiersMotsMs: premier,
+        totalMs: Date.now() - debut,
+        jetonsSortie,
+        finRaison,
+        erreur,
+      }));
       console.log(JSON.stringify({
         mesure: 'raconte',
         modele: MODELE,
+        effort,
+        finRaison,
         premiersMotsMs: premier,
         totalMs: Date.now() - debut,
         jetonsSortie,
