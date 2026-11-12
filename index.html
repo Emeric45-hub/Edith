@@ -133,6 +133,12 @@
   .preferee { display: block; width: 100%; text-align: left; padding: 14px 16px; margin: 0 0 10px; border: 0; border-radius: 16px; background: var(--carte); }
   .preferee b { display: block; font: 700 19px/1.25 var(--conte); color: var(--accent); }
   .preferee span { color: var(--doux); font-size: 14px; }
+  .ligne { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; padding: 13px 14px; margin: 0 0 8px;
+    border: 0; border-radius: 14px; background: var(--carte); text-align: left; font-weight: 600; }
+  .ligne small { color: var(--doux); font-weight: 400; font-size: 13px; white-space: nowrap; }
+  .ligne.retire { opacity: .45; }
+  textarea.champ { font: inherit; color: inherit; line-height: 1.45; resize: vertical; }
+  .champ:disabled { opacity: .6; }
   .mesure { color: var(--trait); font: 12px var(--ui); margin: 18px 0 0; }
   .nav { position: sticky; bottom: 0; display: flex; gap: 10px; margin: 0 -16px; padding: 26px 16px calc(14px + env(safe-area-inset-bottom));
     background: linear-gradient(to top, var(--fond) 80%, transparent); }
@@ -167,6 +173,39 @@
     <input id="herosLibre" placeholder="Un autre héros…" maxlength="60" enterkeyhint="done" autocomplete="off">
     <button>OK</button>
   </form>
+  <div id="zonePropose" style="margin-top:18px"></div>
+  <button class="discret" id="btnReglages" style="margin-top:26px">Réglages : héros, fiches et thèmes</button>
+</main>
+
+<!-- Réglages -->
+<main class="ecran" id="reglages" hidden>
+  <button class="retour" id="btnRetourReglages">‹ Retour</button>
+  <h1>Réglages</h1>
+  <p class="message" id="msgReglages" hidden></p>
+  <h2>Héros</h2>
+  <button class="choix surprise" id="btnNouveauHeros" type="button" style="width:100%;margin-bottom:10px">Ajouter un héros</button>
+  <div id="regHeros"></div>
+  <h2>Thèmes</h2>
+  <form class="libre" id="formNouveauTheme" style="margin:0 0 10px">
+    <input id="nouveauTheme" placeholder="Ajouter un thème…" maxlength="60" enterkeyhint="done" autocomplete="off">
+    <button>OK</button>
+  </form>
+  <div id="regThemes"></div>
+</main>
+
+<!-- Fiche d'un héros -->
+<main class="ecran" id="ficheHeros" hidden>
+  <button class="retour" id="btnRetourFiche">‹ Réglages</button>
+  <h1 id="ficheTitre"></h1>
+  <label for="ficheNom">Nom</label>
+  <input class="champ" id="ficheNom" maxlength="60" autocomplete="off">
+  <label for="ficheTexte">Fiche : son caractère, ses amis, ses lieux, ce qui est drôle chez lui</label>
+  <textarea class="champ" id="ficheTexte" rows="9" maxlength="1500"></textarea>
+  <p class="sous" style="margin-top:8px">Sans fiche, E.D.I.T.H. écrit d'après ce qu'elle sait du personnage.</p>
+  <p class="message" id="msgFiche" hidden></p>
+  <button class="principal" id="btnEnregistreFiche">Enregistrer</button>
+  <button class="discret" id="btnFicheOrigine" hidden>Revenir à la fiche d'origine</button>
+  <button class="discret" id="btnRetireHeros"></button>
 </main>
 
 <!-- Ses préférées -->
@@ -242,7 +281,7 @@
   const STYLES = ['aquarelle', 'gouache', 'papier', 'crayons', 'pastel', 'modeler', 'lino'];
   const NB_PAGES = 6;
   const $ = (id) => document.getElementById(id);
-  const ECRANS = ['connexion', 'choixHeros', 'preferees', 'choixTheme', 'attente', 'lecture'];
+  const ECRANS = ['connexion', 'choixHeros', 'reglages', 'ficheHeros', 'preferees', 'choixTheme', 'attente', 'lecture'];
   function montre(nom) {
     for (const e of ECRANS) $(e).hidden = e !== nom;
     window.scrollTo(0, 0);
@@ -296,10 +335,38 @@
     return h;
   }
 
+  // ——— Listes : celles d'origine (heros.js) corrigées par les réglages de la famille ———
+  const GROUPE_FAMILLE = 'Ses héros à elle';
+  let reglages = { herosAjoutes: [], herosRetires: [], fiches: {}, themesAjoutes: [], themesRetires: [] };
+  let aProposer = { heros: '', theme: '' };   // héros ou thème saisi librement, à proposer d'ajouter
+  function tousLesHeros() {
+    return HEROS.filter((h) => !reglages.herosRetires.includes(h.nom))
+      .map((h) => ({ groupe: h.groupe, nom: h.nom, fiche: reglages.fiches[h.nom] !== undefined ? reglages.fiches[h.nom] : h.fiche }))
+      .concat(reglages.herosAjoutes.map((h) => ({ groupe: GROUPE_FAMILLE, nom: h.nom, fiche: h.fiche || '' })));
+  }
+  // Thèmes de saison, mis en avant à la bonne période
+  function deSaison() {
+    const d = new Date(), m = d.getMonth() + 1, j = d.getDate(), s = [];
+    if ((m === 10 && j >= 15) || (m === 11 && j <= 2)) s.push('Halloween');
+    if (m === 12 && j <= 26) s.push('Noël');
+    return s.filter((n) => !reglages.themesRetires.includes(n));
+  }
+  function groupesDeThemes() {
+    const saison = deSaison(), groupes = [];
+    if (saison.length) groupes.push({ titre: 'En ce moment', noms: saison });
+    for (const g of THEMES) {
+      const noms = g.noms.filter((n) => !reglages.themesRetires.includes(n) && !saison.includes(n));
+      if (noms.length) groupes.push({ titre: g.groupe, noms });
+    }
+    if (reglages.themesAjoutes.length) groupes.push({ titre: 'Ses idées à elle', noms: reglages.themesAjoutes.slice() });
+    return groupes;
+  }
+  const memeNom = (a, b) => a.trim().toLowerCase() === b.trim().toLowerCase();
+
   // ——— Connexion ———
-  firebase.auth().onAuthStateChanged((u) => {
+  firebase.auth().onAuthStateChanged(async (u) => {
     if (!u) { montre('connexion'); return; }
-    if ($('connexion').hidden === false || ECRANS.every((e) => $(e).hidden)) accueil();
+    if ($('connexion').hidden === false || ECRANS.every((e) => $(e).hidden)) { await chargeReglages(); accueil(); }
   });
   $('btnConnexion').onclick = async () => {
     $('msgConnexion').textContent = '';
@@ -329,8 +396,8 @@
 
   function accueil() {
     heros = null; theme = '';
-    const groupes = [];
-    for (const h of HEROS) {
+    const groupes = [], heroes = tousLesHeros();
+    for (const h of heroes) {
       let g = groupes.find((x) => x.titre === h.groupe);
       if (!g) groupes.push(g = { titre: h.groupe, noms: [] });
       g.noms.push(h.nom);
@@ -339,7 +406,7 @@
     grille(c, groupes, (nom) => choisitHeros(nom));
     const s = document.createElement('button');
     s.className = 'choix surprise large'; s.type = 'button'; s.textContent = 'Surprise !';
-    s.onclick = () => choisitHeros(auHasard(HEROS).nom);
+    s.onclick = () => choisitHeros(auHasard(heroes).nom);
     const enveloppe = document.createElement('div'); enveloppe.className = 'grille'; enveloppe.appendChild(s);
     c.prepend(enveloppe);
     $('herosLibre').value = '';
@@ -348,18 +415,27 @@
     $('btnRelire').hidden = !d;
     if (d) $('btnRelire').textContent = 'Relire la dernière : ' + d.titre;
     majBoutonPreferees();
+    // Proposer d'ajouter aux listes ce qui a été saisi librement pour la dernière histoire
+    const zp = $('zonePropose'); zp.innerHTML = '';
+    const propose = (texte, action) => {
+      const b = document.createElement('button'); b.className = 'choix surprise'; b.type = 'button';
+      b.style.cssText = 'width:100%;margin-bottom:10px'; b.textContent = texte;
+      b.onclick = async () => { action(); b.remove(); await sauveReglages(); accueil(); };
+      zp.appendChild(b);
+    };
+    if (aProposer.heros) { const n = aProposer.heros; propose('Ajouter « ' + n + ' » à la liste des héros', () => { reglages.herosAjoutes.push({ nom: n, fiche: '' }); aProposer.heros = ''; }); }
+    if (aProposer.theme) { const n = aProposer.theme; propose('Ajouter « ' + n + ' » à la liste des thèmes', () => { reglages.themesAjoutes.push(n); aProposer.theme = ''; }); }
     montre('choixHeros');
   }
   function choisitHeros(nom) {
-    const connu = HEROS.find((h) => h.nom === nom);
+    const connu = tousLesHeros().find((h) => memeNom(h.nom, nom));
     heros = connu ? { nom: connu.nom, fiche: connu.fiche } : { nom, fiche: '' };
     theme = '';
-    grille($('listeThemes'),
-      THEMES.map((g) => ({ titre: g.groupe, noms: g.noms })),
-      (n) => choisitTheme(n));
+    const groupes = groupesDeThemes();
+    grille($('listeThemes'), groupes, (n) => choisitTheme(n));
     const s = document.createElement('button');
     s.className = 'choix surprise large'; s.type = 'button'; s.textContent = 'Surprise !';
-    s.onclick = () => choisitTheme(auHasard(THEMES.flatMap((g) => g.noms)));
+    s.onclick = () => choisitTheme(auHasard(groupes.flatMap((g) => g.noms)));
     const enveloppe = document.createElement('div'); enveloppe.className = 'grille'; enveloppe.appendChild(s);
     $('listeThemes').prepend(enveloppe);
     $('themeLibre').value = '';
@@ -575,6 +651,11 @@
   };
   $('btnFermer').onclick = quitte;
   function quitte() {
+    // Après une histoire toute neuve : retenir ce qui a été saisi librement, pour proposer de l'ajouter
+    if (histoire && histoire.fini && histoire.diag && heros) {
+      aProposer.heros = tousLesHeros().some((h) => memeNom(h.nom, heros.nom)) ? '' : heros.nom;
+      aProposer.theme = !theme || groupesDeThemes().some((g) => g.noms.some((n) => memeNom(n, theme))) ? '' : theme;
+    }
     if (annulation) annulation.abort();
     veille(false);
     $('page').innerHTML = '';
@@ -707,6 +788,107 @@
     } catch (e) { if (mesImages === images) images.forEach((x, i) => { images[i] = 'echec'; }); }
     if (mesImages === images && !$('lecture').hidden) affiche();
   }
+
+  // ——— Réglages : héros, fiches et thèmes, partagés entre les appareils ———
+  const REGLAGES = db.collection('edith_reglages').doc('listes');
+  async function chargeReglages() {
+    try {
+      const d = await delai(REGLAGES.get(), 4000, null);
+      const v = d && d.exists ? d.data() : null;
+      if (v) reglages = {
+        herosAjoutes: Array.isArray(v.herosAjoutes) ? v.herosAjoutes : [],
+        herosRetires: Array.isArray(v.herosRetires) ? v.herosRetires : [],
+        fiches: v.fiches && typeof v.fiches === 'object' ? v.fiches : {},
+        themesAjoutes: Array.isArray(v.themesAjoutes) ? v.themesAjoutes : [],
+        themesRetires: Array.isArray(v.themesRetires) ? v.themesRetires : [],
+      };
+    } catch (e) {}
+  }
+  async function sauveReglages() {
+    const m = $('msgReglages'); m.hidden = true;
+    try { await REGLAGES.set(reglages); return true; }
+    catch (e) { m.textContent = 'Réglage non enregistré. Vérifie la connexion et réessaie.'; m.hidden = false; return false; }
+  }
+  function ligne(texte, note, classe, action) {
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'ligne' + (classe ? ' ' + classe : '');
+    const t = document.createElement('span'); t.textContent = texte; b.appendChild(t);
+    const n = document.createElement('small'); n.textContent = note; b.appendChild(n);
+    b.onclick = action; return b;
+  }
+  function afficheReglages() {
+    const zh = $('regHeros'); zh.innerHTML = '';
+    for (const h of reglages.herosAjoutes) zh.appendChild(ligne(h.nom, h.fiche ? 'ajouté' : 'ajouté, sans fiche', '', () => ouvreFiche(h.nom)));
+    for (const h of HEROS) {
+      const retire = reglages.herosRetires.includes(h.nom);
+      zh.appendChild(ligne(h.nom, retire ? 'retiré' : (reglages.fiches[h.nom] !== undefined ? 'fiche modifiée' : ''), retire ? 'retire' : '', () => ouvreFiche(h.nom)));
+    }
+    const zt = $('regThemes'); zt.innerHTML = '';
+    for (const n of reglages.themesAjoutes) {
+      zt.appendChild(ligne(n, 'ajouté · toucher pour retirer', '', async () => { reglages.themesAjoutes = reglages.themesAjoutes.filter((x) => x !== n); await sauveReglages(); afficheReglages(); }));
+    }
+    for (const n of THEMES.flatMap((g) => g.noms)) {
+      const retire = reglages.themesRetires.includes(n);
+      zt.appendChild(ligne(n, retire ? 'retiré · toucher pour remettre' : 'toucher pour retirer', retire ? 'retire' : '', async () => {
+        reglages.themesRetires = retire ? reglages.themesRetires.filter((x) => x !== n) : reglages.themesRetires.concat(n);
+        await sauveReglages(); afficheReglages();
+      }));
+    }
+  }
+  $('btnReglages').onclick = () => { $('msgReglages').hidden = true; afficheReglages(); montre('reglages'); };
+  $('btnRetourReglages').onclick = accueil;
+  $('formNouveauTheme').onsubmit = async (e) => {
+    e.preventDefault();
+    const v = $('nouveauTheme').value.trim(); if (!v) return;
+    if (!groupesDeThemes().some((g) => g.noms.some((n) => memeNom(n, v)))) reglages.themesAjoutes.push(v);
+    $('nouveauTheme').value = '';
+    await sauveReglages(); afficheReglages();
+  };
+
+  // Fiche d'un héros : d'origine (nom fixe, fiche modifiable, retrait réversible) ou ajouté par la famille
+  let ficheEnCours = null;   // { origine, ajoute } ; les deux à null pour un nouveau héros
+  function ouvreFiche(nom) {
+    const origine = nom ? HEROS.find((h) => h.nom === nom) || null : null;
+    const ajoute = nom && !origine ? reglages.herosAjoutes.find((h) => h.nom === nom) || null : null;
+    ficheEnCours = { origine, ajoute };
+    $('msgFiche').hidden = true;
+    $('ficheTitre').textContent = nom || 'Nouveau héros';
+    $('ficheNom').value = nom || ''; $('ficheNom').disabled = !!origine;
+    $('ficheTexte').value = origine ? (reglages.fiches[nom] !== undefined ? reglages.fiches[nom] : origine.fiche) : (ajoute ? ajoute.fiche || '' : '');
+    $('btnFicheOrigine').hidden = !(origine && reglages.fiches[nom] !== undefined);
+    const r = $('btnRetireHeros'); r.hidden = !nom; r.dataset.sur = '';
+    r.textContent = origine ? (reglages.herosRetires.includes(nom) ? 'Remettre ce héros dans la liste' : 'Retirer ce héros de la liste') : 'Supprimer ce héros';
+    montre('ficheHeros');
+  }
+  $('btnNouveauHeros').onclick = () => ouvreFiche('');
+  $('btnRetourFiche').onclick = () => { afficheReglages(); montre('reglages'); };
+  $('btnEnregistreFiche').onclick = async () => {
+    const { origine, ajoute } = ficheEnCours, m = $('msgFiche'); m.hidden = true;
+    const nom = $('ficheNom').value.trim(), texte = $('ficheTexte').value.trim();
+    if (origine) {
+      if (texte === origine.fiche.trim()) delete reglages.fiches[origine.nom]; else reglages.fiches[origine.nom] = texte;
+    } else {
+      if (!nom) { m.textContent = 'Il faut un nom.'; m.hidden = false; return; }
+      if (tousLesHeros().some((h) => memeNom(h.nom, nom) && (!ajoute || h.nom !== ajoute.nom))) { m.textContent = 'Ce héros est déjà dans la liste.'; m.hidden = false; return; }
+      if (ajoute) { ajoute.nom = nom; ajoute.fiche = texte; } else reglages.herosAjoutes.push({ nom, fiche: texte });
+    }
+    if (await sauveReglages()) { afficheReglages(); montre('reglages'); }
+  };
+  $('btnFicheOrigine').onclick = async () => {
+    delete reglages.fiches[ficheEnCours.origine.nom];
+    if (await sauveReglages()) ouvreFiche(ficheEnCours.origine.nom);
+  };
+  $('btnRetireHeros').onclick = async () => {
+    const { origine, ajoute } = ficheEnCours, r = $('btnRetireHeros');
+    if (origine) {
+      const n = origine.nom;
+      reglages.herosRetires = reglages.herosRetires.includes(n) ? reglages.herosRetires.filter((x) => x !== n) : reglages.herosRetires.concat(n);
+    } else if (ajoute) {
+      // Suppression définitive (la fiche est perdue) : deux touches
+      if (!r.dataset.sur) { r.dataset.sur = '1'; r.textContent = 'Toucher encore pour supprimer'; return; }
+      reglages.herosAjoutes = reglages.herosAjoutes.filter((h) => h !== ajoute);
+    }
+    if (await sauveReglages()) { afficheReglages(); montre('reglages'); }
+  };
 
   // ——— Dernière histoire (secours si l'app se referme) ———
   function garde(d) { try { localStorage.setItem('edith.derniere', JSON.stringify(d)); } catch (e) {} }

@@ -58,6 +58,10 @@ jobs:
       - name: Déployer
         run: npx --yes firebase-tools@latest deploy --only functions:edith --project diversif-bebe --non-interactive --force
 
+      - name: Effacer automatiquement les anciennes versions de la fonction
+        continue-on-error: true
+        run: npx --yes firebase-tools@latest functions:artifacts:setpolicy --location europe-west1 --days 3 --force --project diversif-bebe --non-interactive
+
       - name: Nettoyer
         if: always()
         run: rm -f "$RUNNER_TEMP/sa.json" "$RUNNER_TEMP/cle.txt"

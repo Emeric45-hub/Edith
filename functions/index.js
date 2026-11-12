@@ -158,18 +158,13 @@ export const raconte = onRequest(
 );
 
 // ---------------------------------------------------------------------------
-// Étape 4 : essai comparatif d'images (Google Imagen 4 Fast / Gemini Flash Image)
+// illustre : une image par page, dessinée par Gemini Flash Image (Vertex AI).
 // La fonction s'authentifie auprès de Google avec son propre compte de service
 // (serveur de métadonnées) : aucune clé à stocker.
 
 const PROJET = 'diversif-bebe';
 
-// Les deux modèles comparés (Imagen est retiré depuis le 30/06/2026 ;
-// gemini-2.5-flash-image est son remplaçant recommandé par Google).
-const MODELES_IMAGE = {
-  eco: { id: 'gemini-2.5-flash-image', lieu: 'global' },
-  gemini: { id: 'gemini-3.1-flash-image', lieu: 'global' },
-};
+const MODELE_IMAGE = { id: 'gemini-3.1-flash-image', lieu: 'global' };
 
 const STYLES = {
   aquarelle: 'Soft watercolor children\'s picture book illustration, gentle washes, visible paper texture, warm luminous palette',
@@ -180,17 +175,6 @@ const STYLES = {
   modeler: 'Children\'s picture book illustration made of modelling clay, photographed handmade plasticine shapes with fingerprints, soft studio light',
   lino: 'Linocut print children\'s picture book illustration, bold carved shapes, three or four flat inks, slightly off-register texture',
 };
-
-// Scènes de l'histoire d'essai « Les 7 ours et le trésor de patates » :
-// décor et indices seulement, jamais les personnages.
-const SCENES = [
-  'The doormat of a tiny cozy wooden cottage in a forest at morning, an old yellowed treasure map with a big red cross sticking out from under the doormat',
-  'A winding forest path seen from above, an old treasure map lying upside down on the ground, seven rows of small bear paw prints walking in a big circle back to the same little cottage',
-  'A sunny river with a small wooden footbridge just beside, big splashes and ripples in the water, a round pebble with a tiny bite mark on the riverbank',
-  'A forest clearing with a spiky pine cone and a hedgehog sleeping curled in a ball, opening onto a wide field with a big red cross on the ground',
-  'A dug-up field with an old open wooden treasure chest holding a single striped sock with a hole, heaps of earth around it full of round golden potatoes',
-  'Night: a little cottage with glowing windows under a big gentle moon, a potato with a small candle on the windowsill, a quiet potato field in the moonlight',
-];
 
 const CONSIGNE_IMAGE = 'No story characters, no people, no faces, no text, no letters, no logos. Full-bleed landscape composition filling the whole frame edge to edge: no border, no margin, no frame, no card. Calm and joyful, suitable for a 4-year-old at bedtime.';
 
@@ -206,23 +190,6 @@ async function verifieFamille(req) {
   const jeton = (req.get('authorization') || '').replace(/^Bearer\s+/i, '');
   const decode = await getAuth().verifyIdToken(jeton);
   if (decode.uid !== UID_FAMILLE) throw new Error('compte non autorisé');
-}
-
-async function genereImagen(modele, consigne, jeton) {
-  const url = `https://${modele.lieu}-aiplatform.googleapis.com/v1/projects/${PROJET}/locations/${modele.lieu}/publishers/google/models/${modele.id}:predict`;
-  const r = await fetch(url, {
-    method: 'POST',
-    headers: { Authorization: 'Bearer ' + jeton, 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      instances: [{ prompt: consigne }],
-      parameters: { sampleCount: 1, aspectRatio: '4:3', personGeneration: 'dont_allow' },
-    }),
-  });
-  const texte = await r.text();
-  if (!r.ok) throw new Error(`Imagen ${r.status} : ${texte.slice(0, 300)}`);
-  const p = JSON.parse(texte).predictions?.[0];
-  if (!p?.bytesBase64Encoded) throw new Error('Imagen : aucune image (filtre de sécurité ?) ' + texte.slice(0, 300));
-  return { mime: p.mimeType || 'image/png', donnees: p.bytesBase64Encoded };
 }
 
 const pause = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -276,13 +243,9 @@ export const illustre = onRequest(
     if (req.method !== 'POST') { res.status(405).send('Méthode non autorisée'); return; }
     try { await verifieFamille(req); } catch { res.status(401).send('Non autorisé'); return; }
 
-    const cleModele = MODELES_IMAGE[req.body?.modele] ? req.body.modele : 'gemini';
-    const modele = MODELES_IMAGE[cleModele];
+    const modele = MODELE_IMAGE;
     const style = STYLES[req.body?.style] || STYLES.aquarelle;
-    // La scène vient de l'histoire (texte), ou de la page d'essai (numéro).
-    const scene = typeof req.body?.scene === 'string'
-      ? req.body.scene.replace(/\s+/g, ' ').slice(0, 500).trim()
-      : SCENES[Number(req.body?.scene)];
+    const scene = typeof req.body?.scene === 'string' ? req.body.scene.replace(/\s+/g, ' ').slice(0, 500).trim() : '';
     if (!scene) { res.status(400).send('Scène manquante'); return; }
 
     const consigne = `${style}. ${scene}. ${CONSIGNE_IMAGE}`;
