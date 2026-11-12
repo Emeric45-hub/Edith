@@ -63,7 +63,7 @@ export const raconte = onRequest(
 
     // 2. Demande
     const EFFORTS = ['low', 'medium', 'high'];
-    const effort = EFFORTS.includes(req.body?.effort) ? req.body.effort : 'medium';
+    const effort = EFFORTS.includes(req.body?.effort) ? req.body.effort : 'low'; // choix d'Emeric (12/11)
     const heros = String(req.body?.heros || '').slice(0, 80).trim();
     const theme = String(req.body?.theme || '').slice(0, 80).trim();
     if (!heros || !theme) { res.status(400).send('Héros et thème obligatoires'); return; }
