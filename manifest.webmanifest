@@ -1,0 +1,16 @@
+{
+  "name": "E.D.I.T.H.",
+  "short_name": "E.D.I.T.H.",
+  "description": "Et Dodo : Invente Ton Histoire",
+  "lang": "fr",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#1c1830",
+  "theme_color": "#1c1830",
+  "icons": [
+    { "src": "icones/icone-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icones/icone-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}

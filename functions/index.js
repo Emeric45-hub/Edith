@@ -1,11 +1,12 @@
-// E.D.I.T.H. — fonction serveur (étape 3 : test de faisabilité)
-// Rôle : n'accepter que le compte famille, appeler Claude, renvoyer le texte
-// au fil de l'eau (affichage progressif) pour mesurer le délai des premiers mots.
+// E.D.I.T.H. — fonctions serveur
+// raconte : n'accepte que le compte famille, appelle Claude et renvoie
+// l'histoire au fil de l'eau. Les consignes d'écriture sont dans consignes.js.
 
 import { onRequest } from 'firebase-functions/v2/https';
 import { defineSecret } from 'firebase-functions/params';
 import { initializeApp } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
+import { CONSIGNES, construitDemande } from './consignes.js';
 
 initializeApp();
 
@@ -18,13 +19,6 @@ const UID_FAMILLE = 'vEOrJXLWnLcpXX8ctL6X7pwqSWi1';
 const ORIGINES = ['https://emeric45-hub.github.io'];
 
 const MODELE = 'claude-fable-5-2';
-
-const CONSIGNES = `Tu inventes une histoire du soir pour une petite fille de 4 ans et demi, lue à voix haute par un parent.
-- 6 pages, 800 à 900 mots en tout, en français.
-- Le héros reste fidèle à son caractère dans ses propres histoires ou séries.
-- Drôle, joyeux, un gag qui revient au moins trois fois ; jamais de vraie peur ni de méchanceté.
-- Dernière page calme (retour à la maison, dodo du héros), qui se termine par « Bonne nuit, … ».
-Format : le titre sur la première ligne, puis chaque page précédée de « Page N » seule sur sa ligne.`;
 
 function entetesCors(req, res) {
   const origine = req.get('origin') || '';
@@ -67,6 +61,9 @@ export const raconte = onRequest(
     const heros = String(req.body?.heros || '').slice(0, 80).trim();
     const theme = String(req.body?.theme || '').slice(0, 80).trim();
     if (!heros || !theme) { res.status(400).send('Héros et thème obligatoires'); return; }
+    const fiche = String(req.body?.fiche || '').slice(0, 1500).trim();
+    const deja = (Array.isArray(req.body?.deja) ? req.body.deja : [])
+      .slice(0, 20).map((d) => String(d).slice(0, 300).trim()).filter(Boolean);
 
     // 3. Appel à Claude en mode flux
     const debut = Date.now();
@@ -83,7 +80,7 @@ export const raconte = onRequest(
         stream: true,
         output_config: { effort },
         system: CONSIGNES,
-        messages: [{ role: 'user', content: `Héros : ${heros}\nThème : ${theme}` }],
+        messages: [{ role: 'user', content: construitDemande({ heros, theme, fiche, deja }) }],
       }),
     });
 

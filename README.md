@@ -2,7 +2,9 @@
 
 « Et Dodo : Invente Ton Histoire » — histoires du soir inventées à la demande.
 
-- `functions/` : fonction serveur Firebase (`raconte`), seule à détenir la clé Claude ; n'accepte que le compte famille.
-- `test/` : page de test de vitesse (étape 3).
-- Déploiement : `.github/workflows/deploy-functions.yml`, à chaque fusion sur `main` touchant `functions/`.
+- `index.html` : l'app (choix du héros et du thème, lecture page par page).
+- `heros.js` : héros, fiches et thèmes.
+- `functions/` : fonctions serveur Firebase. `raconte` écrit l'histoire (consignes dans `consignes.js`), `illustre` dessine une image. Compte famille uniquement.
+- `test/` : pages de test (vitesse du texte, comparaison d'images).
+- Déploiement des fonctions : `.github/workflows/deploy-functions.yml`, à chaque fusion sur `main` touchant `functions/`.
 - Secrets GitHub : `ANTHROPIC_API_KEY`, `FIREBASE_DEPLOY_SA`.
