@@ -235,6 +235,8 @@
     <input id="themeLibre" placeholder="Un autre thème…" maxlength="60" enterkeyhint="done" autocomplete="off">
     <button>OK</button>
   </form>
+  <h2>Le style des images</h2>
+  <div class="grille" id="listeStyles"></div>
   <div class="barre">
     <p class="recap" id="recap"></p>
     <button class="principal" id="btnRaconte" disabled>Raconte !</button>
@@ -287,7 +289,16 @@
   });
   const URL_RACONTE = "https://europe-west1-diversif-bebe.cloudfunctions.net/raconte";
   const URL_ILLUSTRE = "https://europe-west1-diversif-bebe.cloudfunctions.net/illustre";
-  const STYLES = ['aquarelle', 'gouache', 'papier', 'crayons', 'pastel', 'modeler', 'lino'];
+  const STYLES = [['aquarelle', 'Aquarelle'], ['gouache', 'Gouache'], ['papier', 'Papier découpé'], ['crayons', 'Crayons de couleur'],
+    ['pastel', 'Pastel'], ['modeler', 'Pâte à modeler'], ['lino', 'Linogravure']];
+  const nomStyle = (cle) => (STYLES.find((x) => x[0] === cle) || ['', cle])[1];
+  let styleChoisi = '';    // '' : surprise
+  // Surprise : au hasard, mais jamais le même style deux soirs de suite
+  function tireStyle() {
+    let dernier = ''; try { dernier = localStorage.getItem('edith.style') || ''; } catch (e) {}
+    const possibles = STYLES.map((x) => x[0]).filter((c) => c !== dernier);
+    return possibles[Math.floor(Math.random() * possibles.length)];
+  }
   const NB_PAGES = 6;
   const $ = (id) => document.getElementById(id);
   const ECRANS = ['connexion', 'choixHeros', 'reglages', 'ficheHeros', 'preferees', 'choixTheme', 'attente', 'lecture'];
@@ -448,8 +459,19 @@
     const enveloppe = document.createElement('div'); enveloppe.className = 'grille'; enveloppe.appendChild(s);
     $('listeThemes').prepend(enveloppe);
     $('themeLibre').value = '';
+    styleChoisi = ''; majStyles();
     majRecap();
     montre('choixTheme');
+  }
+  function majStyles() {
+    const z = $('listeStyles'); z.innerHTML = '';
+    for (const [cle, nom] of [['', 'Surprise !']].concat(STYLES)) {
+      const b = document.createElement('button'); b.type = 'button';
+      b.className = 'choix' + (cle ? '' : ' surprise large'); b.textContent = nom;
+      b.setAttribute('aria-pressed', cle === styleChoisi ? 'true' : 'false');
+      b.onclick = () => { styleChoisi = cle; majStyles(); };
+      z.appendChild(b);
+    }
   }
   function choisitTheme(nom) {
     theme = nom;
@@ -521,7 +543,8 @@
     annulation = new AbortController();
     const signal = annulation.signal;
     histoire = null; pageCourante = 0;
-    images = []; tempsImages = []; style = auHasard(STYLES);
+    images = []; tempsImages = []; style = styleChoisi || tireStyle();
+    try { localStorage.setItem('edith.style', style); } catch (e) {}
     gardee = false; idHistoire = null; sauvees = [];
     attente(true);
     montre('attente');
@@ -625,7 +648,7 @@
     if (!fin) $('msgCoeur').hidden = true;
     const mesure = $('mesure'), dg = h.diag;
     mesure.hidden = !(h.fini && dg && pageCourante === h.pages.length - 1);
-    if (!mesure.hidden) mesure.textContent = 'Écrite en ' + Math.round(dg.totalMs / 1000) + ' s, premiers mots à ' + Math.round(dg.premiersMotsMs / 1000) + ' s · ' + dg.jetonsSortie + ' jetons · images ' + style + ' : ' + tempsImages.join(', ');
+    if (!mesure.hidden) mesure.textContent = 'Écrite en ' + Math.round(dg.totalMs / 1000) + ' s, premiers mots à ' + Math.round(dg.premiersMotsMs / 1000) + ' s · ' + dg.jetonsSortie + ' jetons · images ' + nomStyle(style) + ' : ' + tempsImages.join(', ');
     const zone = $('page');
     // On ne réécrit que ce qui a changé, pour ne pas faire sauter le texte pendant l'arrivée.
     while (zone.children.length > p.paras.length) zone.lastChild.remove();
