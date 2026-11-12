@@ -526,6 +526,7 @@
         body: JSON.stringify({ heros: heros.nom, theme, fiche: heros.fiche, deja }),
       });
       if (rep.status === 401) throw new Error('Ce compte n\'est pas le compte famille.');
+      if (rep.status === 402) throw new Error('Le crédit Claude est épuisé. Ajoute des fonds sur platform.claude.com, puis réessaie.');
       if (!rep.ok) throw new Error('E.D.I.T.H. ne répond pas (erreur ' + rep.status + ').');
       const lecteur = rep.body.getReader();
       const dec = new TextDecoder();
