@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>E.D.I.T.H. — images</title>
+<style>
+  :root { color-scheme: light dark; --fond:#f6f4ef; --texte:#1f1d1a; --doux:#6b665e; --accent:#2e7df0; --carte:#fff; }
+  @media (prefers-color-scheme: dark) { :root { --fond:#141312; --texte:#ece8e1; --doux:#9a948a; --carte:#1f1d1b; } }
+  * { box-sizing: border-box; }
+  body { margin:0; padding:16px; background:var(--fond); color:var(--texte); font:17px/1.5 -apple-system, system-ui, sans-serif; }
+  h1 { font-size:20px; margin:0 0 12px; }
+  h2 { font-size:18px; margin:18px 0 8px; }
+  .carte { background:var(--carte); border-radius:14px; padding:14px; margin-bottom:14px; }
+  label { display:block; font-size:14px; color:var(--doux); margin-top:8px; }
+  input, select { width:100%; font:inherit; padding:10px; border-radius:10px; border:1px solid #8884; background:transparent; color:inherit; }
+  button { margin-top:12px; width:100%; font:inherit; font-weight:600; padding:12px; border:0; border-radius:12px; background:var(--accent); color:#fff; }
+  button.second { background:transparent; color:var(--accent); border:1px solid var(--accent); }
+  button:disabled { opacity:.5; }
+  .grille { display:grid; grid-template-columns:1fr; gap:10px; }
+  @media (min-width:700px) { .grille { grid-template-columns:1fr 1fr; } }
+  figure { margin:0; }
+  figure img { width:100%; aspect-ratio:4/3; object-fit:cover; border-radius:10px; background:#8882; display:block; }
+  figcaption { font-size:13px; color:var(--doux); margin-top:4px; }
+  .erreur { font-size:13px; color:#c0392b; white-space:pre-wrap; aspect-ratio:4/3; overflow:auto; padding:8px; border-radius:10px; background:#c0392b14; }
+  #etat { font-size:15px; color:var(--doux); white-space:pre-line; }
+</style>
+</head>
+<body>
+<h1>E.D.I.T.H. — comparaison d'images</h1>
+
+<div class="carte" id="connexion">
+  <label>E-mail du compte famille</label>
+  <input id="email" type="email" autocomplete="username">
+  <label>Mot de passe</label>
+  <input id="mdp" type="password" autocomplete="current-password">
+  <button id="btnConnexion">Se connecter</button>
+</div>
+
+<div class="carte" id="demande" hidden>
+  <div>Histoire : « Les 7 ours et le trésor de patates » (6 scènes), dessinée par deux générateurs, A et B, sans savoir lequel est lequel.</div>
+  <label>Style</label>
+  <select id="style">
+    <option value="aquarelle">Aquarelle</option>
+    <option value="papier">Papier découpé</option>
+    <option value="crayons">Crayons de couleur</option>
+    <option value="gouache">Gouache</option>
+  </select>
+  <button id="btnGo">Dessiner les 12 images</button>
+  <button id="btnReveler" class="second" disabled>Révéler qui est A et qui est B</button>
+</div>
+
+<div class="carte"><div id="etat">Pas encore lancé.</div></div>
+
+<h2>Générateur A</h2>
+<div class="grille" id="grilleA"></div>
+<h2>Générateur B</h2>
+<div class="grille" id="grilleB"></div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script>
+  firebase.initializeApp({
+    apiKey: "AIzaSyC7sZDCVP-r34T33L6nEwWzibsrXnxletA",
+    authDomain: "diversif-bebe.firebaseapp.com",
+    projectId: "diversif-bebe",
+  });
+  const URL_FONCTION = "https://europe-west1-diversif-bebe.cloudfunctions.net/illustre";
+  const NOMS = { imagen: 'Google Imagen 4 Fast (≈ 0,02 $ / image)', gemini: 'Google Gemini 3.1 Flash Image (≈ 0,067 $ / image)' };
+  const $ = (id) => document.getElementById(id);
+  let correspondance = null; // { A: 'imagen' | 'gemini', B: ... }
+  const temps = { imagen: [], gemini: [] };
+
+  firebase.auth().onAuthStateChanged((u) => {
+    $('connexion').hidden = !!u;
+    $('demande').hidden = !u;
+  });
+
+  $('btnConnexion').onclick = async () => {
+    try {
+      await firebase.auth().signInWithEmailAndPassword($('email').value.trim(), $('mdp').value);
+    } catch (e) { $('etat').textContent = 'Connexion impossible : ' + e.code; }
+  };
+
+  function caseVide(grille, n) {
+    const f = document.createElement('figure');
+    f.innerHTML = '<img alt=""><figcaption>Scène ' + (n + 1) + ' : en cours…</figcaption>';
+    grille.appendChild(f);
+    return f;
+  }
+
+  async function uneImage(jeton, modele, style, n, fig) {
+    const t0 = performance.now();
+    try {
+      const rep = await fetch(URL_FONCTION, {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer ' + jeton, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ modele, style, scene: n }),
+      });
+      const txt = await rep.text();
+      let d; try { d = JSON.parse(txt); } catch { d = { erreur: txt }; }
+      const s = ((performance.now() - t0) / 1000).toFixed(1);
+      if (!rep.ok || !d.donnees) throw new Error((d.erreur || ('Réponse ' + rep.status)));
+      fig.querySelector('img').src = 'data:' + d.mime + ';base64,' + d.donnees;
+      fig.querySelector('figcaption').textContent = 'Scène ' + (n + 1) + ' · ' + s + ' s · ' + Math.round(d.donnees.length * 0.75 / 1024) + ' Ko';
+      temps[modele].push(Number(s));
+    } catch (e) {
+      fig.innerHTML = '<div class="erreur">Scène ' + (n + 1) + ' : ' + e.message + '</div>';
+    }
+  }
+
+  $('btnGo').onclick = async () => {
+    $('btnGo').disabled = true;
+    $('btnReveler').disabled = true;
+    $('grilleA').innerHTML = '';
+    $('grilleB').innerHTML = '';
+    temps.imagen = []; temps.gemini = [];
+    correspondance = Math.random() < 0.5 ? { A: 'imagen', B: 'gemini' } : { A: 'gemini', B: 'imagen' };
+    const style = $('style').value;
+    $('etat').textContent = 'Dessin en cours (12 images, quelques dizaines de secondes)…';
+    const jeton = await firebase.auth().currentUser.getIdToken();
+    const taches = [];
+    for (let n = 0; n < 6; n++) {
+      for (const lettre of ['A', 'B']) {
+        const fig = caseVide($('grille' + lettre), n);
+        taches.push(() => uneImage(jeton, correspondance[lettre], style, n, fig));
+      }
+    }
+    // 4 demandes à la fois au plus
+    let i = 0;
+    await Promise.all(Array.from({ length: 4 }, async () => { while (i < taches.length) await taches[i++](); }));
+    const moy = (t) => t.length ? (t.reduce((a, b) => a + b, 0) / t.length).toFixed(1) + ' s' : '—';
+    $('etat').textContent = 'Terminé.\nTemps moyen par image — A : ' + moy(temps[correspondance.A]) + ' · B : ' + moy(temps[correspondance.B]);
+    $('btnGo').disabled = false;
+    $('btnReveler').disabled = false;
+  };
+
+  $('btnReveler').onclick = () => {
+    if (!correspondance) return;
+    $('etat').textContent += '\n\nA = ' + NOMS[correspondance.A] + '\nB = ' + NOMS[correspondance.B];
+    $('btnReveler').disabled = true;
+  };
+</script>
+</body>
+</html>
