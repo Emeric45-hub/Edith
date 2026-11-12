@@ -108,6 +108,13 @@
   #page { flex: 1; font: 21px/1.62 var(--conte); padding: 8px 0 24px; }
   #page p { margin: 0 0 .85em; }
   @media (min-width: 620px) { #page { font-size: 25px; } #titreHistoire { font-size: 34px; } }
+  .illu { margin: 14px 0 4px; aspect-ratio: 4 / 3; border-radius: 18px; overflow: hidden; background: var(--carte); }
+  .illu img { width: 100%; height: 100%; object-fit: cover; display: block; opacity: 0; transition: opacity .7s ease; }
+  .illu img.pret { opacity: 1; }
+  .illu.attend { animation: souffle 2.2s ease-in-out infinite; }
+  @keyframes souffle { 0%, 100% { background: var(--carte); } 50% { background: var(--carte-2); } }
+  @media (prefers-reduced-motion: reduce) { .illu.attend { animation: none; } .illu img { transition: none; } }
+  .mesure { color: var(--trait); font: 12px var(--ui); margin: 18px 0 0; }
   .nav { position: sticky; bottom: 0; display: flex; gap: 10px; margin: 0 -16px; padding: 26px 16px calc(14px + env(safe-area-inset-bottom));
     background: linear-gradient(to top, var(--fond) 80%, transparent); }
   .nav .prec { flex: 0 0 64px; border-radius: 18px; border: 1.5px solid var(--trait); background: transparent; font-size: 20px; }
@@ -180,7 +187,9 @@
     <span id="numPage"></span>
   </div>
   <h1 id="titreHistoire"></h1>
+  <div class="illu" id="illu" hidden><img id="imgPage" alt=""></div>
   <div id="page"></div>
+  <p class="mesure" id="mesure" hidden></p>
   <div class="nav">
     <button class="prec" id="btnPrec" aria-label="Page précédente">‹</button>
     <button class="principal" id="btnSuiv">Page suivante</button>
@@ -197,6 +206,8 @@
     projectId: "diversif-bebe",
   });
   const URL_RACONTE = "https://europe-west1-diversif-bebe.cloudfunctions.net/raconte";
+  const URL_ILLUSTRE = "https://europe-west1-diversif-bebe.cloudfunctions.net/illustre";
+  const STYLES = ['aquarelle', 'gouache', 'papier', 'crayons', 'pastel', 'modeler', 'lino'];
   const NB_PAGES = 6;
   const $ = (id) => document.getElementById(id);
   const ECRANS = ['connexion', 'choixHeros', 'choixTheme', 'attente', 'lecture'];
@@ -212,6 +223,9 @@
   let pageCourante = 0;
   let annulation = null;   // AbortController de l'histoire en cours
   let minuterie = null;
+  let images = [];         // par page : 'attente', 'encours', 'echec' ou l'image (data:…)
+  let style = '';          // un seul style d'illustration par histoire
+  let dessinEnCours = false;
 
   // ——— Lecture du texte envoyé par la fonction ———
   // Format : TITRE : … / ### PAGE n / SCENE : … / texte / ### RESUME / phrase, puis [[DIAG]]{…}
@@ -367,6 +381,7 @@
     annulation = new AbortController();
     const signal = annulation.signal;
     histoire = null; pageCourante = 0;
+    images = []; style = auHasard(STYLES);
     attente(true);
     montre('attente');
     veille(true);
@@ -387,6 +402,7 @@
         if (done) break;
         brut += dec.decode(value, { stream: true });
         histoire = analyse(brut);
+        dessine(signal);
         if (histoire.pages[0] && histoire.pages[0].paras.length) {
           if ($('lecture').hidden) { clearInterval(minuterie); montre('lecture'); }
           affiche();
@@ -398,6 +414,7 @@
         throw new Error(raison || 'L\'histoire est arrivée vide.');
       }
       histoire.fini = true;
+      dessine(signal);
       garde({ heros: heros.nom, theme, titre: histoire.titre || (heros.nom + ' · ' + theme), brut, date: Date.now() });
       affiche();
     } catch (e) {
@@ -412,6 +429,36 @@
     }
   }
 
+  // ——— Illustrations : une à la fois, dans l'ordre des pages ———
+  // Chaque page porte une ligne SCENE ; l'image se dessine pendant qu'on lit la page précédente.
+  async function dessine(signal) {
+    histoire.pages.forEach((p, i) => { if (p.scene && images[i] === undefined) images[i] = 'attente'; });
+    if (dessinEnCours) return;
+    dessinEnCours = true;
+    try {
+      for (;;) {
+        const i = images.indexOf('attente');
+        if (i < 0 || signal.aborted) break;
+        images[i] = 'encours';
+        const mesImages = images;
+        let resultat = 'echec';
+        try {
+          const jeton = await firebase.auth().currentUser.getIdToken();
+          const rep = await fetch(URL_ILLUSTRE, {
+            method: 'POST', signal,
+            headers: { 'Authorization': 'Bearer ' + jeton, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ scene: histoire.pages[i].scene, style }),
+          });
+          const d = await rep.json();
+          if (rep.ok && d.donnees) resultat = 'data:' + d.mime + ';base64,' + d.donnees;
+        } catch (e) {}
+        if (signal.aborted || mesImages !== images) break;
+        images[i] = resultat;
+        if (!$('lecture').hidden) affiche();
+      }
+    } finally { dessinEnCours = false; }
+  }
+
   // ——— Lecture page par page ———
   function affiche() {
     const h = histoire;
@@ -420,6 +467,15 @@
     const p = h.pages[pageCourante];
     $('titreHistoire').textContent = h.titre;
     $('titreHistoire').hidden = pageCourante !== 0 || !h.titre;
+    const img = images[pageCourante], cadre = $('illu'), balise = $('imgPage');
+    const prete = typeof img === 'string' && img.startsWith('data:');
+    cadre.hidden = !(prete || img === 'attente' || img === 'encours');
+    cadre.classList.toggle('attend', !prete);
+    if (prete) { if (balise.src !== img) { balise.classList.remove('pret'); balise.onload = () => balise.classList.add('pret'); balise.src = img; } }
+    else { balise.classList.remove('pret'); balise.removeAttribute('src'); }
+    const mesure = $('mesure'), dg = h.diag;
+    mesure.hidden = !(h.fini && dg && pageCourante === h.pages.length - 1);
+    if (!mesure.hidden) mesure.textContent = 'Écrite en ' + Math.round(dg.totalMs / 1000) + ' s, premiers mots à ' + Math.round(dg.premiersMotsMs / 1000) + ' s · ' + dg.jetonsSortie + ' jetons · images : ' + style;
     const zone = $('page');
     // On ne réécrit que ce qui a changé, pour ne pas faire sauter le texte pendant l'arrivée.
     while (zone.children.length > p.paras.length) zone.lastChild.remove();
@@ -472,7 +528,7 @@
   $('btnRelire').onclick = () => {
     const d = derniere(); if (!d) return;
     heros = { nom: d.heros, fiche: '' }; theme = d.theme;
-    histoire = analyse(d.brut); histoire.fini = true; pageCourante = 0;
+    histoire = analyse(d.brut); histoire.fini = true; histoire.diag = null; pageCourante = 0; images = [];
     $('page').innerHTML = '';
     montre('lecture'); affiche(); veille(true);
   };
