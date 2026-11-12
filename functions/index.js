@@ -167,9 +167,10 @@ export const raconte = onRequest(
 
 const PROJET = 'diversif-bebe';
 
-// Les deux modèles comparés. Identifiants Vertex AI à confirmer au premier essai.
+// Les deux modèles comparés (Imagen est retiré depuis le 30/06/2026 ;
+// gemini-2.5-flash-image est son remplaçant recommandé par Google).
 const MODELES_IMAGE = {
-  imagen: { id: 'imagen-4.0-fast-generate-001', lieu: 'us-central1' },
+  eco: { id: 'gemini-2.5-flash-image', lieu: 'global' },
   gemini: { id: 'gemini-3.1-flash-image', lieu: 'global' },
 };
 
@@ -224,7 +225,23 @@ async function genereImagen(modele, consigne, jeton) {
   return { mime: p.mimeType || 'image/png', donnees: p.bytesBase64Encoded };
 }
 
+const pause = (ms) => new Promise((r) => setTimeout(r, ms));
+
+// Google refuse parfois une demande (429 « Resource exhausted ») sur un projet
+// à faible quota : on réessaie jusqu'à 4 fois en espaçant de plus en plus.
 async function genereGemini(modele, consigne, jeton) {
+  const attentes = [2000, 5000, 10000, 20000];
+  for (let essai = 0; ; essai++) {
+    try {
+      return await genereGeminiUneFois(modele, consigne, jeton);
+    } catch (e) {
+      if (!e.message.includes(' 429 ') || essai >= attentes.length) throw e;
+      await pause(attentes[essai] + Math.random() * 1000);
+    }
+  }
+}
+
+async function genereGeminiUneFois(modele, consigne, jeton) {
   const hote = modele.lieu === 'global' ? 'aiplatform.googleapis.com' : `${modele.lieu}-aiplatform.googleapis.com`;
   const url = `https://${hote}/v1/projects/${PROJET}/locations/${modele.lieu}/publishers/google/models/${modele.id}:generateContent`;
   const r = await fetch(url, {
@@ -269,9 +286,7 @@ export const illustre = onRequest(
     const debut = Date.now();
     try {
       const jeton = await jetonGoogle();
-      const image = cleModele === 'imagen'
-        ? await genereImagen(modele, consigne, jeton)
-        : await genereGemini(modele, consigne, jeton);
+      const image = await genereGemini(modele, consigne, jeton);
       const ms = Date.now() - debut;
       console.log(JSON.stringify({ mesure: 'illustre', modele: modele.id, scene: n, ms, ko: Math.round(image.donnees.length * 0.75 / 1024) }));
       res.json({ ms, mime: image.mime, donnees: image.donnees });
