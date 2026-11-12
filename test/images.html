@@ -66,10 +66,10 @@
     projectId: "diversif-bebe",
   });
   const URL_FONCTION = "https://europe-west1-diversif-bebe.cloudfunctions.net/illustre";
-  const NOMS = { imagen: 'Google Imagen 4 Fast (≈ 0,02 $ / image)', gemini: 'Google Gemini 3.1 Flash Image (≈ 0,067 $ / image)' };
+  const NOMS = { eco: 'Google Gemini 2.5 Flash Image (0,039 $ / image)', gemini: 'Google Gemini 3.1 Flash Image (0,067 $ / image)' };
   const $ = (id) => document.getElementById(id);
-  let correspondance = null; // { A: 'imagen' | 'gemini', B: ... }
-  const temps = { imagen: [], gemini: [] };
+  let correspondance = null; // { A: 'eco' | 'gemini', B: ... }
+  const temps = { eco: [], gemini: [] };
 
   firebase.auth().onAuthStateChanged((u) => {
     $('connexion').hidden = !!u;
@@ -114,8 +114,8 @@
     $('btnReveler').disabled = true;
     $('grilleA').innerHTML = '';
     $('grilleB').innerHTML = '';
-    temps.imagen = []; temps.gemini = [];
-    correspondance = Math.random() < 0.5 ? { A: 'imagen', B: 'gemini' } : { A: 'gemini', B: 'imagen' };
+    temps.eco = []; temps.gemini = [];
+    correspondance = Math.random() < 0.5 ? { A: 'eco', B: 'gemini' } : { A: 'gemini', B: 'eco' };
     const style = $('style').value;
     $('etat').textContent = 'Dessin en cours (12 images, quelques dizaines de secondes)…';
     const jeton = await firebase.auth().currentUser.getIdToken();
@@ -126,9 +126,9 @@
         taches.push(() => uneImage(jeton, correspondance[lettre], style, n, fig));
       }
     }
-    // 4 demandes à la fois au plus
+    // 2 demandes à la fois au plus (quota Google)
     let i = 0;
-    await Promise.all(Array.from({ length: 4 }, async () => { while (i < taches.length) await taches[i++](); }));
+    await Promise.all(Array.from({ length: 2 }, async () => { while (i < taches.length) await taches[i++](); }));
     const moy = (t) => t.length ? (t.reduce((a, b) => a + b, 0) / t.length).toFixed(1) + ' s' : '—';
     $('etat').textContent = 'Terminé.\nTemps moyen par image — A : ' + moy(temps[correspondance.A]) + ' · B : ' + moy(temps[correspondance.B]);
     $('btnGo').disabled = false;
