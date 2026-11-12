@@ -172,10 +172,13 @@ const MODELES_IMAGE = {
 };
 
 const STYLES = {
-  aquarelle: 'Soft watercolor children\'s picture book illustration, gentle washes, visible paper texture, warm pastel palette',
+  aquarelle: 'Soft watercolor children\'s picture book illustration, gentle washes, visible paper texture, warm luminous palette',
+  gouache: 'Gouache children\'s picture book illustration, flat opaque colors, rounded simple shapes, slightly retro storybook feel',
   papier: 'Cut-paper collage children\'s picture book illustration, layered textured paper shapes, bold simple forms, cheerful colors',
-  crayons: 'Colored pencil children\'s picture book illustration, hand-drawn strokes, cozy and whimsical',
-  gouache: 'Gouache children\'s picture book illustration, flat opaque colors, rounded shapes, mid-century storybook feel',
+  crayons: 'Colored pencil children\'s picture book illustration, visible hand-drawn strokes on cream paper, cozy and whimsical',
+  pastel: 'Soft chalk pastel children\'s picture book illustration, velvety blended colors, grainy paper, dreamy light',
+  modeler: 'Children\'s picture book illustration made of modelling clay, photographed handmade plasticine shapes with fingerprints, soft studio light',
+  lino: 'Linocut print children\'s picture book illustration, bold carved shapes, three or four flat inks, slightly off-register texture',
 };
 
 // Scènes de l'histoire d'essai « Les 7 ours et le trésor de patates » :
@@ -273,19 +276,34 @@ export const illustre = onRequest(
     if (req.method !== 'POST') { res.status(405).send('Méthode non autorisée'); return; }
     try { await verifieFamille(req); } catch { res.status(401).send('Non autorisé'); return; }
 
-    const cleModele = req.body?.modele;
+    const cleModele = MODELES_IMAGE[req.body?.modele] ? req.body.modele : 'gemini';
     const modele = MODELES_IMAGE[cleModele];
     const style = STYLES[req.body?.style] || STYLES.aquarelle;
-    const n = Number(req.body?.scene);
-    if (!modele || !(n >= 0 && n < SCENES.length)) { res.status(400).send('Modèle ou scène inconnus'); return; }
+    // La scène vient de l'histoire (texte), ou de la page d'essai (numéro).
+    const scene = typeof req.body?.scene === 'string'
+      ? req.body.scene.replace(/\s+/g, ' ').slice(0, 500).trim()
+      : SCENES[Number(req.body?.scene)];
+    if (!scene) { res.status(400).send('Scène manquante'); return; }
 
-    const consigne = `${style}. ${SCENES[n]}. ${CONSIGNE_IMAGE}`;
+    const consigne = `${style}. ${scene}. ${CONSIGNE_IMAGE}`;
     const debut = Date.now();
     try {
       const jeton = await jetonGoogle();
-      const image = await genereGemini(modele, consigne, jeton);
+      let image = await genereGemini(modele, consigne, jeton);
+      const koAvant = Math.round(image.donnees.length * 0.75 / 1024);
+      // Allègement : les images arrivent en PNG d'environ 2 Mo.
+      try {
+        const sharp = (await import('sharp')).default;
+        const jpeg = await sharp(Buffer.from(image.donnees, 'base64'))
+          .resize({ width: 1280, withoutEnlargement: true })
+          .jpeg({ quality: 82 })
+          .toBuffer();
+        image = { mime: 'image/jpeg', donnees: jpeg.toString('base64') };
+      } catch (e) {
+        console.error('illustre : allègement impossible', e.message);
+      }
       const ms = Date.now() - debut;
-      console.log(JSON.stringify({ mesure: 'illustre', modele: modele.id, scene: n, ms, ko: Math.round(image.donnees.length * 0.75 / 1024) }));
+      console.log(JSON.stringify({ mesure: 'illustre', modele: modele.id, ms, koAvant, ko: Math.round(image.donnees.length * 0.75 / 1024) }));
       res.json({ ms, mime: image.mime, donnees: image.donnees });
     } catch (e) {
       console.error('illustre', modele.id, e.message);
