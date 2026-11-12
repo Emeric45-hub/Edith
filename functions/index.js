@@ -169,7 +169,7 @@ const PROJET = 'diversif-bebe';
 
 // Les deux modèles comparés. Identifiants Vertex AI à confirmer au premier essai.
 const MODELES_IMAGE = {
-  imagen: { id: 'imagen-4.0-fast-generate-001', lieu: 'europe-west4' },
+  imagen: { id: 'imagen-4.0-fast-generate-001', lieu: 'us-central1' },
   gemini: { id: 'gemini-3.1-flash-image', lieu: 'global' },
 };
 
