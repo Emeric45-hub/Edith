@@ -117,14 +117,22 @@
   /* iPad à l'horizontale : image à gauche, texte à droite */
   @media (min-width: 900px) and (orientation: landscape) {
     #lecture.deux { max-width: 1240px; display: grid; grid-template-columns: 1fr 1fr; column-gap: 32px;
-      grid-template-rows: auto auto 1fr auto auto; align-content: start; }
+      grid-template-rows: auto auto 1fr auto auto auto auto; align-content: start; }
     #lecture.deux .entete { grid-column: 1 / -1; }
-    #lecture.deux .illu { grid-column: 1; grid-row: 2 / 6; align-self: start; position: sticky; top: 24px; margin-top: 18px; }
-    #lecture.deux #titreHistoire, #lecture.deux #page, #lecture.deux .mesure, #lecture.deux .nav { grid-column: 2; }
+    #lecture.deux .illu { grid-column: 1; grid-row: 2 / 8; align-self: start; position: sticky; top: 24px; margin-top: 18px; }
+    #lecture.deux #titreHistoire, #lecture.deux #page, #lecture.deux .coeur, #lecture.deux #msgCoeur, #lecture.deux .mesure, #lecture.deux .nav { grid-column: 2; }
+    #lecture.deux .entete { grid-row: 1; } #lecture.deux #titreHistoire { grid-row: 2; } #lecture.deux #page { grid-row: 3; }
+    #lecture.deux .coeur { grid-row: 4; } #lecture.deux #msgCoeur { grid-row: 5; } #lecture.deux .mesure { grid-row: 6; } #lecture.deux .nav { grid-row: 7; }
     #lecture.deux #titreHistoire { font-size: 30px; }
     #lecture.deux #page { font-size: 23px; padding-top: 14px; }
     #lecture.deux .nav { margin: 0; padding-left: 0; padding-right: 0; align-self: end; }
   }
+  .coeur { width: 100%; margin: 22px 0 0; padding: 14px; border-radius: 18px; border: 1.5px solid var(--trait); background: transparent; font-weight: 700; font-size: 18px; color: var(--texte); }
+  .coeur[aria-pressed="true"] { border-color: #ff8fa3; color: #ff8fa3; background: rgba(255, 143, 163, .08); }
+  .coeur:disabled { opacity: .5; }
+  .preferee { display: block; width: 100%; text-align: left; padding: 14px 16px; margin: 0 0 10px; border: 0; border-radius: 16px; background: var(--carte); }
+  .preferee b { display: block; font: 700 19px/1.25 var(--conte); color: var(--accent); }
+  .preferee span { color: var(--doux); font-size: 14px; }
   .mesure { color: var(--trait); font: 12px var(--ui); margin: 18px 0 0; }
   .nav { position: sticky; bottom: 0; display: flex; gap: 10px; margin: 0 -16px; padding: 26px 16px calc(14px + env(safe-area-inset-bottom));
     background: linear-gradient(to top, var(--fond) 80%, transparent); }
@@ -151,6 +159,7 @@
 <main class="ecran" id="choixHeros" hidden>
   <div class="marque"><span class="lune"></span>E.D.I.T.H.</div>
   <h1>Qui est le héros ce soir ?</h1>
+  <div class="grille" id="zonePreferees" hidden style="margin-top:14px"><button class="choix large" id="btnPreferees" type="button" style="color:#ff8fa3">♥ Ses préférées</button></div>
   <button class="discret" id="btnRelire" hidden></button>
   <div id="listeHeros"></div>
   <h2>Une autre idée</h2>
@@ -158,6 +167,14 @@
     <input id="herosLibre" placeholder="Un autre héros…" maxlength="60" enterkeyhint="done" autocomplete="off">
     <button>OK</button>
   </form>
+</main>
+
+<!-- Ses préférées -->
+<main class="ecran" id="preferees" hidden>
+  <button class="retour" id="btnRetourPreferees">‹ Retour</button>
+  <h1>Ses préférées</h1>
+  <p class="sous">Une histoire gardée qu'on ne relit pas dans le mois s'efface toute seule.</p>
+  <div id="listePreferees"></div>
 </main>
 
 <!-- Choix du thème -->
@@ -201,6 +218,8 @@
   <h1 id="titreHistoire"></h1>
   <div class="illu" id="illu" hidden><img id="imgPage" alt=""></div>
   <div id="page"></div>
+  <button class="coeur" id="btnCoeur" hidden aria-pressed="false"></button>
+  <p class="message" id="msgCoeur" hidden></p>
   <p class="mesure" id="mesure" hidden></p>
   <div class="nav">
     <button class="prec" id="btnPrec" aria-label="Page précédente">‹</button>
@@ -210,6 +229,7 @@
 
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <script src="heros.js"></script>
 <script>
   firebase.initializeApp({
@@ -222,7 +242,7 @@
   const STYLES = ['aquarelle', 'gouache', 'papier', 'crayons', 'pastel', 'modeler', 'lino'];
   const NB_PAGES = 6;
   const $ = (id) => document.getElementById(id);
-  const ECRANS = ['connexion', 'choixHeros', 'choixTheme', 'attente', 'lecture'];
+  const ECRANS = ['connexion', 'choixHeros', 'preferees', 'choixTheme', 'attente', 'lecture'];
   function montre(nom) {
     for (const e of ECRANS) $(e).hidden = e !== nom;
     window.scrollTo(0, 0);
@@ -239,6 +259,10 @@
   let style = '';          // un seul style d'illustration par histoire
   let dessinEnCours = false;
   let tempsImages = [];    // durée de chaque image, pour la ligne de mesure
+  let gardee = false;      // l'histoire affichée est dans « Ses préférées »
+  let idHistoire = null;   // son identifiant dans la base
+  let sauvees = [];        // images déjà enregistrées
+  let retraitDemande = false, minuterieRetrait = null;
 
   // ——— Lecture du texte envoyé par la fonction ———
   // Format : TITRE : … / ### PAGE n / SCENE : … / texte / ### RESUME / phrase, puis [[DIAG]]{…}
@@ -323,6 +347,7 @@
     const d = derniere();
     $('btnRelire').hidden = !d;
     if (d) $('btnRelire').textContent = 'Relire la dernière : ' + d.titre;
+    majBoutonPreferees();
     montre('choixHeros');
   }
   function choisitHeros(nom) {
@@ -412,16 +437,17 @@
     const signal = annulation.signal;
     histoire = null; pageCourante = 0;
     images = []; tempsImages = []; style = auHasard(STYLES);
+    gardee = false; idHistoire = null; sauvees = [];
     attente(true);
     montre('attente');
     veille(true);
     let brut = '';
     try {
-      const jeton = await firebase.auth().currentUser.getIdToken();
+      const [jeton, deja] = await Promise.all([firebase.auth().currentUser.getIdToken(), dejaRacontees(heros.nom)]);
       const rep = await fetch(URL_RACONTE, {
         method: 'POST', signal,
         headers: { 'Authorization': 'Bearer ' + jeton, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ heros: heros.nom, theme, fiche: heros.fiche }),
+        body: JSON.stringify({ heros: heros.nom, theme, fiche: heros.fiche, deja }),
       });
       if (rep.status === 401) throw new Error('Ce compte n\'est pas le compte famille.');
       if (!rep.ok) throw new Error('E.D.I.T.H. ne répond pas (erreur ' + rep.status + ').');
@@ -442,6 +468,7 @@
       }
       histoire.fini = true;
       dessine(signal);
+      note();
       garde({ heros: heros.nom, theme, titre: histoire.titre || (heros.nom + ' · ' + theme), brut, date: Date.now() });
       rafraichit();
     } catch (e) {
@@ -483,6 +510,7 @@
         } catch (e) { tempsImages[i] = 'échec'; }
         if (signal.aborted || mesImages !== images) break;
         images[i] = resultat;
+        sauveImages();
         rafraichit();
       }
     } finally { dessinEnCours = false; }
@@ -503,6 +531,12 @@
     $('lecture').classList.toggle('deux', !cadre.hidden);
     if (prete) { if (balise.src !== img) { balise.classList.remove('pret'); balise.onload = () => balise.classList.add('pret'); balise.src = img; } }
     else { balise.classList.remove('pret'); balise.removeAttribute('src'); }
+    const fin = h.fini && pageCourante === h.pages.length - 1;
+    const coeur = $('btnCoeur');
+    coeur.hidden = !fin;
+    coeur.setAttribute('aria-pressed', gardee ? 'true' : 'false');
+    coeur.textContent = !gardee ? '♡ On la garde ?' : (retraitDemande ? 'Toucher encore pour la retirer' : '♥ Gardée dans ses préférées');
+    if (!fin) $('msgCoeur').hidden = true;
     const mesure = $('mesure'), dg = h.diag;
     mesure.hidden = !(h.fini && dg && pageCourante === h.pages.length - 1);
     if (!mesure.hidden) mesure.textContent = 'Écrite en ' + Math.round(dg.totalMs / 1000) + ' s, premiers mots à ' + Math.round(dg.premiersMotsMs / 1000) + ' s · ' + dg.jetonsSortie + ' jetons · images ' + style + ' : ' + tempsImages.join(', ');
@@ -547,6 +581,133 @@
     accueil();
   }
 
+  // ——— Mémoire : préférées, anti-redites ———
+  const db = firebase.firestore();
+  const HISTOIRES = db.collection('edith_histoires');   // histoires gardées (+ sous-collection images)
+  const JOURNAL = db.collection('edith_journal');       // une ligne par histoire racontée
+  const UN_MOIS = 30 * 24 * 3600 * 1000;
+  const maintenant = () => firebase.firestore.FieldValue.serverTimestamp();
+  const delai = (promesse, ms, defaut) => Promise.race([promesse, new Promise((r) => setTimeout(() => r(defaut), ms))]);
+
+  // Une ligne par histoire racontée, gardée ou non, pour ne pas refaire la même.
+  function note() {
+    JOURNAL.add({ date: maintenant(), heros: heros.nom, theme, titre: histoire.titre, resume: histoire.resume }).catch(() => {});
+  }
+  async function dejaRacontees(nom) {
+    try {
+      const r = await delai(JOURNAL.where('heros', '==', nom).get(), 4000, null);
+      if (!r) return [];
+      return r.docs.map((d) => d.data())
+        .sort((a, b) => (b.date ? b.date.toMillis() : 0) - (a.date ? a.date.toMillis() : 0))
+        .slice(0, 15)
+        .map((d) => (d.titre || '') + ' : ' + (d.resume || '') + ' (thème : ' + (d.theme || '') + ')');
+    } catch (e) { return []; }
+  }
+
+  // Le cœur : garder ou ne plus garder l'histoire affichée.
+  $('btnCoeur').onclick = async () => {
+    const coeur = $('btnCoeur'); $('msgCoeur').hidden = true;
+    if (gardee && !retraitDemande) {
+      retraitDemande = true; affiche();
+      clearTimeout(minuterieRetrait);
+      minuterieRetrait = setTimeout(() => { retraitDemande = false; if (!$('lecture').hidden) affiche(); }, 4000);
+      return;
+    }
+    clearTimeout(minuterieRetrait); retraitDemande = false;
+    coeur.disabled = true;
+    try {
+      if (!gardee) {
+        const ref = HISTOIRES.doc();
+        await ref.set({
+          heros: heros.nom, theme, titre: histoire.titre, resume: histoire.resume, style,
+          pages: histoire.pages.map((p) => ({ paras: p.paras })),
+          gardeeLe: maintenant(), relectures: 0,
+        });
+        idHistoire = ref.id; gardee = true; sauvees = [];
+        sauveImages();
+      } else {
+        await supprime(idHistoire);
+        gardee = false; idHistoire = null; sauvees = [];
+      }
+    } catch (e) {
+      $('msgCoeur').textContent = 'Impossible pour le moment. Vérifie la connexion et réessaie.';
+      $('msgCoeur').hidden = false;
+    }
+    coeur.disabled = false;
+    if (!$('lecture').hidden) affiche();
+  };
+  // Les images arrivent parfois après le cœur : on enregistre celles qui manquent.
+  async function sauveImages() {
+    if (!gardee || !idHistoire) return;
+    const id = idHistoire;
+    for (let i = 0; i < images.length; i++) {
+      const img = images[i];
+      if (sauvees[i] || typeof img !== 'string' || !img.startsWith('data:')) continue;
+      sauvees[i] = true;
+      try { await HISTOIRES.doc(id).collection('images').doc(String(i)).set({ d: img }); }
+      catch (e) { if (id === idHistoire) sauvees[i] = false; }
+    }
+  }
+  async function supprime(id) {
+    const imgs = await HISTOIRES.doc(id).collection('images').get();
+    await Promise.all(imgs.docs.map((d) => d.ref.delete()));
+    await HISTOIRES.doc(id).delete();
+  }
+
+  // Liste des préférées. Au passage : une histoire gardée jamais relue depuis un mois s'efface.
+  async function chargePreferees() {
+    const r = await delai(HISTOIRES.get(), 8000, null);
+    if (!r) throw new Error('base injoignable');
+    const liste = [];
+    for (const d of r.docs) {
+      const h = d.data();
+      const quand = h.gardeeLe ? h.gardeeLe.toMillis() : Date.now();
+      if (!h.relectures && Date.now() - quand > UN_MOIS) { supprime(d.id).catch(() => {}); continue; }
+      liste.push({ id: d.id, quand, ...h });
+    }
+    return liste.sort((a, b) => b.quand - a.quand);
+  }
+  async function majBoutonPreferees() {
+    try { $('zonePreferees').hidden = !(await chargePreferees()).length; } catch (e) {}
+  }
+  $('btnPreferees').onclick = async () => {
+    const zone = $('listePreferees');
+    zone.textContent = 'Un instant…';
+    montre('preferees');
+    try {
+      const liste = await chargePreferees();
+      zone.textContent = liste.length ? '' : 'Aucune histoire gardée pour le moment.';
+      for (const h of liste) {
+        const b = document.createElement('button'); b.className = 'preferee'; b.type = 'button';
+        const t = document.createElement('b'); t.textContent = h.titre || (h.heros + ' · ' + h.theme);
+        const s = document.createElement('span'); s.textContent = h.heros + ' · ' + h.theme;
+        b.append(t, s);
+        b.onclick = () => ouvrePreferee(h);
+        zone.appendChild(b);
+      }
+    } catch (e) { zone.textContent = 'Impossible de charger les préférées. Vérifie la connexion.'; }
+  };
+  $('btnRetourPreferees').onclick = accueil;
+  async function ouvrePreferee(h) {
+    if (annulation) annulation.abort();
+    heros = { nom: h.heros, fiche: '' }; theme = h.theme; style = h.style || '';
+    histoire = { titre: h.titre || '', pages: (h.pages || []).map((p) => ({ scene: '', paras: p.paras || [] })), resume: h.resume || '', diag: null, fini: true };
+    pageCourante = 0; tempsImages = [];
+    gardee = true; idHistoire = h.id;
+    images = histoire.pages.map(() => 'encours'); sauvees = histoire.pages.map(() => true);
+    const mesImages = images;
+    $('page').innerHTML = '';
+    montre('lecture'); affiche(); veille(true);
+    HISTOIRES.doc(h.id).update({ relectures: firebase.firestore.FieldValue.increment(1), relueLe: maintenant() }).catch(() => {});
+    try {
+      const r = await HISTOIRES.doc(h.id).collection('images').get();
+      if (mesImages !== images) return;
+      const parNumero = {}; r.docs.forEach((d) => { parNumero[d.id] = d.data().d; });
+      images.forEach((x, i) => { images[i] = parNumero[i] || 'echec'; });
+    } catch (e) { if (mesImages === images) images.forEach((x, i) => { images[i] = 'echec'; }); }
+    if (mesImages === images && !$('lecture').hidden) affiche();
+  }
+
   // ——— Dernière histoire (secours si l'app se referme) ———
   function garde(d) { try { localStorage.setItem('edith.derniere', JSON.stringify(d)); } catch (e) {} }
   function derniere() {
@@ -559,6 +720,7 @@
     const d = derniere(); if (!d) return;
     heros = { nom: d.heros, fiche: '' }; theme = d.theme;
     histoire = analyse(d.brut); histoire.fini = true; histoire.diag = null; pageCourante = 0; images = []; tempsImages = [];
+    gardee = false; idHistoire = null; sauvees = [];
     $('page').innerHTML = '';
     montre('lecture'); affiche(); veille(true);
   };
