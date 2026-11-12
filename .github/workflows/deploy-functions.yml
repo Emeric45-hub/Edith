@@ -40,6 +40,11 @@ jobs:
           printf '%s' "$SA" > "$RUNNER_TEMP/sa.json"
           echo "GOOGLE_APPLICATION_CREDENTIALS=$RUNNER_TEMP/sa.json" >> "$GITHUB_ENV"
 
+      - name: Activer Vertex AI (génération d'images)
+        run: |
+          gcloud auth activate-service-account --key-file "$GOOGLE_APPLICATION_CREDENTIALS" --quiet
+          gcloud services enable aiplatform.googleapis.com --project diversif-bebe --quiet
+
       - name: Envoyer la clé Claude à Firebase
         if: github.event_name == 'workflow_dispatch' && inputs.envoyer_cle
         env:
